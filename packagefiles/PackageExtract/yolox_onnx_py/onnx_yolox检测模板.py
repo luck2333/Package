@@ -1,3 +1,5 @@
+"""YOLOX ONNX 通用检测模板脚本。"""
+
 #!/usr/bin/env python3
 # Copyright (c) Megvii, Inc. and its affiliates.
 
@@ -27,6 +29,7 @@ import onnxruntime
 
 
 def make_parser():
+    """构建命令行参数解析器，配置模型与输入输出路径。"""
     parser = argparse.ArgumentParser("onnxruntime inference sample")
     parser.add_argument(
         "-m",
@@ -66,10 +69,12 @@ def make_parser():
 
 # yolox_onnx 需要的一些函数(从yolox中提取)
 def mkdir(path):
+    """创建目录，保证推理结果输出位置存在。"""
     if not os.path.exists(path):
         os.makedirs(path)
 
 def preprocess(img, input_size, swap=(2, 0, 1)):
+    """按比例缩放并填充图像，适配 YOLOX 输入。"""
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
@@ -88,7 +93,7 @@ def preprocess(img, input_size, swap=(2, 0, 1)):
     return padded_img, r
 
 def nms(boxes, scores, nms_thr):
-    """Single class NMS implemented in Numpy."""
+    """执行单类别 NMS，去除高重叠度的冗余框。"""
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
@@ -117,7 +122,7 @@ def nms(boxes, scores, nms_thr):
     return keep
 
 def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
-    """Multiclass NMS implemented in Numpy"""
+    """根据类别策略执行多类别 NMS。"""
     if class_agnostic:
         nms_method = multiclass_nms_class_agnostic
     else:
@@ -125,7 +130,7 @@ def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
     return nms_method(boxes, scores, nms_thr, score_thr)
 
 def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-aware version."""
+    """类别敏感的多类别 NMS 实现。"""
     final_dets = []
     num_classes = scores.shape[1]
     for cls_ind in range(num_classes):
@@ -148,7 +153,7 @@ def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
     return np.concatenate(final_dets, 0)
 
 def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-agnostic version."""
+    """类别无关的多类别 NMS 实现。"""
     cls_inds = scores.argmax(1)
     cls_scores = scores[np.arange(len(cls_inds)), cls_inds]
 
@@ -166,6 +171,7 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
     return dets
 
 def demo_postprocess(outputs, img_size, p6=False):
+    """将预测结果映射回输入图片的尺度。"""
     grids = []
     expanded_strides = []
     strides = [8, 16, 32] if not p6 else [8, 16, 32, 64]
@@ -188,6 +194,7 @@ def demo_postprocess(outputs, img_size, p6=False):
     return outputs
 
 def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
+    """在图像上绘制检测框与标签，方便调试。"""
     _COLORS = np.array(
         [
             0.000, 0.447, 0.741,
@@ -303,6 +310,7 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
 
     return img
 def onnx_output_pairs_data_pin_5():
+    """运行 YOLOX 模型获取 PIN 检测框并保存可视化。"""
     VOC_CLASSES = ('package', "bga", "qfn", "Form", "Note")
     args = make_parser().parse_args()
 
