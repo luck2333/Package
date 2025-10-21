@@ -1,3 +1,10 @@
+"""ONNX 推理工具集
+===================
+
+该模块封装了 OCR 检测模型在 ONNXRuntime 下运行时所需的图像预处理、
+后处理以及推理接口，提供给 QFP/BGA 等封装流程在 F4.6-F4.9 阶段调用。
+"""
+
 import os
 import sys
 import matplotlib.pyplot as plt
@@ -14,10 +21,14 @@ from PIL import Image,ImageDraw
 
 # PalldeOCR 检测模块 需要用到的图片预处理类
 class NormalizeImage(object):
-    """ normalize image such as substract mean, divide std
+    """图像归一化算子。
+
+    将输入图像按指定均值、方差做归一化处理，是 OCR DBNet 模型
+    推理前的关键预处理步骤。
     """
 
     def __init__(self, scale=None, mean=None, std=None, order='chw', **kwargs):
+        """初始化归一化因子与均值、方差配置。"""
         if isinstance(scale, str):
             scale = eval(scale)
         self.scale = np.float32(scale if scale is not None else 1.0 / 255.0)
@@ -29,6 +40,7 @@ class NormalizeImage(object):
         self.std = np.array(std).reshape(shape).astype('float32')
 
     def __call__(self, data):
+        """对输入图片执行归一化并返回处理后的数据字典。"""
         img = data['image']
         from PIL import Image
         if isinstance(img, Image.Image):
@@ -42,13 +54,17 @@ class NormalizeImage(object):
 
 
 class ToCHWImage(object):
-    """ convert hwc image to chw image
+    """通道维度转换算子。
+
+    将图像从 HWC 布局转换为 ONNX 模型所需的 CHW 布局。
     """
 
     def __init__(self, **kwargs):
+        """保持与其他预处理算子一致的接口。"""
         pass
 
     def __call__(self, data):
+        """完成 HWC->CHW 的通道变换。"""
         img = data['image']
         from PIL import Image
         if isinstance(img, Image.Image):
@@ -58,23 +74,37 @@ class ToCHWImage(object):
 
 
 class KeepKeys(object):
+    """字典取值工具。
+
+    依据设置的关键字列表提取对应的键值，保持与 PaddleOCR 原版
+    前处理保持一致。
+    """
     def __init__(self, keep_keys, **kwargs):
+        """保存需要保留的键名列表。"""
         self.keep_keys = keep_keys
 
     def __call__(self, data):
+        """提取并返回所需键对应的值列表。"""
         data_list = []
         for key in self.keep_keys:
             data_list.append(data[key])
         return data_list
 
 class DetResizeForTest(object):
+    """检测模型专用的尺寸缩放工具。
+
+    负责将输入图片缩放到 32 的倍数大小，同时记录缩放比例，
+    以便于后处理阶段还原真实坐标。
+    """
     def __init__(self, **kwargs):
+        """记录缩放策略与边长限制参数。"""
         super(DetResizeForTest, self).__init__()
         self.resize_type = 0
         self.limit_side_len = kwargs['limit_side_len']
         self.limit_type = kwargs.get('limit_type', 'min')
 
     def __call__(self, data):
+        """缩放图像并返回缩放比例，方便还原坐标。"""
         img = data['image']
         # src_h, src_w, _ = img.shape
         src_h, src_w = img.shape[:2]
@@ -84,13 +114,7 @@ class DetResizeForTest(object):
         return data
 
     def resize_image_type0(self, img):
-        """
-        resize image to a size multiple of 32 which is required by the network
-        args:
-            img(array): array with shape [h, w, c]
-        return(tuple):
-            img, (ratio_h, ratio_w)
-        """
+        """将图片缩放至 32 的倍数，并返回纵横缩放比。"""
         limit_side_len = self.limit_side_len
         h, w= img.shape[:2]
 
@@ -123,8 +147,10 @@ class DetResizeForTest(object):
 
 ### 检测结果后处理过程（得到检测框）
 class DBPostProcess(object):
-    """
-    The post process for Differentiable Binarization (DB).
+    """DBNet 检测后处理。
+
+    依据二值化概率图提取文本框，并结合 unclip 与 NMS 得到最终
+    的检测框集合。
     """
 
     def __init__(self,
@@ -134,6 +160,7 @@ class DBPostProcess(object):
                  unclip_ratio=2.0,
                  use_dilation=False,
                  **kwargs):
+        """配置 DBNet 后处理阈值、候选数与 unclip 比例。"""
         self.thresh = thresh
         self.box_thresh = box_thresh
         self.max_candidates = max_candidates
@@ -143,10 +170,7 @@ class DBPostProcess(object):
             [[1, 1], [1, 1]])
 
     def boxes_from_bitmap(self, pred, _bitmap, dest_width, dest_height):
-        '''
-        _bitmap: single map with shape (1, H, W),
-                whose values are binarized as {0, 1}
-        '''
+        """从二值图中恢复文本框集合。"""
 
         bitmap = _bitmap
         height, width = bitmap.shape
@@ -187,6 +211,7 @@ class DBPostProcess(object):
         return np.array(boxes, dtype=np.int16), scores
 
     def unclip(self, box):
+        """根据 unclip 比例扩展检测框，用于补偿文字边缘。"""
         unclip_ratio = self.unclip_ratio
         poly = Polygon(box)
         distance = poly.area * unclip_ratio / poly.length
@@ -196,6 +221,7 @@ class DBPostProcess(object):
         return expanded
 
     def get_mini_boxes(self, contour):
+        """计算最小外接矩形及其四个顶点顺序。"""
         bounding_box = cv2.minAreaRect(contour)
         points = sorted(list(cv2.boxPoints(bounding_box)), key=lambda x: x[0])
 
@@ -219,6 +245,7 @@ class DBPostProcess(object):
         return box, min(bounding_box[1])
 
     def box_score_fast(self, bitmap, _box):
+        """计算候选框区域内的平均置信度，过滤低质量框。"""
         h, w = bitmap.shape[:2]
         box = _box.copy()
         xmin = np.clip(np.floor(box[:, 0].min()).astype(np.int_), 0, w - 1)
@@ -233,6 +260,7 @@ class DBPostProcess(object):
         return cv2.mean(bitmap[ymin:ymax + 1, xmin:xmax + 1], mask)[0]
 
     def __call__(self, outs_dict, shape_list):
+        """执行后处理，结合缩放信息输出批量检测框。"""
         pred = outs_dict
         pred = pred[:, 0, :, :]
         segmentation = pred > self.thresh
@@ -255,6 +283,7 @@ class DBPostProcess(object):
 ## 根据推理结果解码识别结果
 class process_pred(object):
     def __init__(self, character_dict_path=None, character_type='ch', use_space_char=False):
+        """读取字符字典文件并建立索引映射。"""
         self.character_str = ''
         with open(character_dict_path, 'rb') as fin:
             lines = fin.readlines()
@@ -272,10 +301,12 @@ class process_pred(object):
         self.character = dict_character
 
     def add_special_char(self, dict_character):
+        """在字符集前添加空白符以适配 CTC 输出。"""
         dict_character = ['blank'] + dict_character
         return dict_character
 
     def decode(self, text_index, text_prob=None, is_remove_duplicate=False):
+        """将索引序列转换为文本并返回置信度。"""
         result_list = []
         ignored_tokens = [0]
         batch_size = len(text_index)
@@ -302,6 +333,7 @@ class process_pred(object):
         return result_list
 
     def __call__(self, preds, label=None):
+        """将预测结果转换为文字列表或与标签对比。"""
         if not isinstance(preds, np.ndarray):
             preds = np.array(preds)
         preds_idx = preds.argmax(axis=2)
@@ -315,6 +347,7 @@ class process_pred(object):
 
 class det_rec_functions(object):
     def __init__(self, image, use_large=False):
+        """初始化检测与识别模型会话，并缓存输入图像。"""
         self.img = image.copy()
         self.det_file = 'model/ocr_model/onnx_det/0529det_model.onnx'
         self.small_rec_file = 'model/ocr_model/onnx_rec/package_rec_model.onnx'
@@ -329,7 +362,7 @@ class det_rec_functions(object):
 
     ## 图片预处理过程
     def transform(self, data, ops=None):
-        """ transform """
+        """按照预处理算子顺序依次处理输入数据。"""
         if ops is None:
             ops = []
         for op in ops:
@@ -339,12 +372,7 @@ class det_rec_functions(object):
         return data
 
     def create_operators(self, op_param_list, global_config=None):
-        """
-        create operators based on the config
-
-        Args:
-            params(list): a dict list, used to create some operators
-        """
+        """根据配置构造预处理算子链。"""
         assert isinstance(op_param_list, list), ('operator config should be a list')
         ops = []
         for operator in op_param_list:
@@ -360,10 +388,7 @@ class det_rec_functions(object):
 
     ### 检测框的后处理
     def order_points_clockwise(self, pts):
-        """
-        reference from: https://github.com/jrosebr1/imutils/blob/master/imutils/perspective.py
-        # sort the points based on their x-coordinates
-        """
+        """按照顺时针顺序重排文本框顶点。"""
         xSorted = pts[np.argsort(pts[:, 0]), :]
 
         # grab the left-most and right-most points from the sorted
@@ -384,12 +409,14 @@ class det_rec_functions(object):
         return rect
 
     def clip_det_res(self, points, img_height, img_width):
+        """确保检测框点位于图像范围内，避免坐标越界。"""
         for pno in range(points.shape[0]):
             points[pno, 0] = int(min(max(points[pno, 0], 0), img_width - 1))
             points[pno, 1] = int(min(max(points[pno, 1], 0), img_height - 1))
         return points
 
     def filter_tag_det_res(self, dt_boxes, image_shape):
+        """过滤异常小框并规范顶点顺序。"""
         img_height, img_width = image_shape[0:2]
         dt_boxes_new = []
         for box in dt_boxes:
@@ -405,6 +432,7 @@ class det_rec_functions(object):
 
     ### 定义图片前处理过程，和检测结果后处理过程
     def get_process(self):
+        """构建检测前处理列表与 DBNet 后处理器。"""
         det_db_thresh = 0.3
         det_db_box_thresh = 0.5
         max_candidates = 2000
@@ -436,13 +464,7 @@ class det_rec_functions(object):
         return infer_before_process_op, det_re_process_op
 
     def sorted_boxes(self, dt_boxes):
-        """
-        Sort text boxes in order from top to bottom, left to right
-        args:
-            dt_boxes(array):detected text boxes with shape [4, 2]
-        return:
-            sorted boxes(array) with shape [4, 2]
-        """
+        """按从上到下、从左到右的顺序排列检测框，便于逐行识别。"""
         num_boxes = dt_boxes.shape[0]
         sorted_boxes = sorted(dt_boxes, key=lambda x: (x[0][1], x[0][0]))
         _boxes = list(sorted_boxes)
@@ -457,6 +479,7 @@ class det_rec_functions(object):
 
     ### 图像输入预处理
     def resize_norm_img(self, img, max_wh_ratio):
+        """将识别输入缩放到固定高度并完成归一化。"""
         imgC, imgH, imgW = [int(v) for v in "3, 48, 100".split(",")]
         assert imgC == img.shape[2]
         imgW = int((32 * max_wh_ratio))
@@ -477,6 +500,7 @@ class det_rec_functions(object):
 
     ## 推理检测图片中的部分
     def get_boxes(self,image_path,show):
+        """执行检测模型推理并返回排序后的文本框集合。"""
         img_ori = self.img
         img_part = img_ori.copy()
         data_part = {'image': img_part}
@@ -500,6 +524,7 @@ class det_rec_functions(object):
 
     ### 根据bounding box得到单元格图片
     def get_rotate_crop_image(self, img, points):
+        """按照四点坐标裁剪旋转后的文字图块。"""
         img_crop_width = int(
             max(
                 np.linalg.norm(points[0] - points[1]),
@@ -526,6 +551,7 @@ class det_rec_functions(object):
 
     ### 单张图片推理
     def get_img_res(self, onnx_model, img, process_op):
+        """对单张切片执行识别模型推理并返回解码结果。"""
         h, w = img.shape[:2]
         img = self.resize_norm_img(img, w * 1.0 / h)
         img = img[np.newaxis, :]
@@ -535,6 +561,7 @@ class det_rec_functions(object):
         return result
 
     def recognition_img(self, dt_boxes,Is_crop):
+        """根据检测框批量裁剪并完成文本识别。"""
         img_ori = self.img
         img = img_ori.copy()
         ### 识别过程
@@ -560,9 +587,7 @@ class det_rec_functions(object):
         return results, results_info
 
 def ONNX_Use(image,image_path, dt_boxes):
-    '''
-    dt_boxes:list[[[x1,y1],[x2,y1],[x2,y2],[x1,y2]],[[x1,y1],[x2,y1],[x2,y2],[x1,y2]]]
-    '''
+    """执行 OCR 检测 + 识别流程并返回文本列表。"""
     ocr_sys = det_rec_functions(image)
     # dt_boxes = ocr_sys.get_boxes(image_path, show=True)
     # dt_boxes:list[[[x1,y1],[x2,y1],[x2,y2],[x1,y2]],[[x1,y1],[x2,y1],[x2,y2],[x1,y2]]]
@@ -574,10 +599,7 @@ def ONNX_Use(image,image_path, dt_boxes):
     return text_list
 
 def Run_onnx(image_path, dt_boxes):
-    '''
-    输入图片地址或者直接输入图像矩阵
-    输出list['A','(0.6)']
-    '''
+    """以图片路径为输入触发 OCR 识别，返回识别文本。"""
 
     image = cv2.imread(image_path)
     # ONNX运行代码
@@ -586,14 +608,12 @@ def Run_onnx(image_path, dt_boxes):
     return text_list
 
 def ONNX_Det(image,image_path):
+    """仅执行检测阶段，返回文本框坐标集合。"""
     ocr_sys = det_rec_functions(image)
     dt_boxes = ocr_sys.get_boxes(image_path, show=False)
     return dt_boxes
 def Run_onnx_det(image_path):
-    '''
-        输入图片地址或者直接输入图像矩阵
-        输出list['A','(0.6)']
-        '''
+    """从图像路径启动检测推理，输出 Numpy 形式的框坐标。"""
 
     image = cv2.imread(image_path)
     # ONNX运行代码
