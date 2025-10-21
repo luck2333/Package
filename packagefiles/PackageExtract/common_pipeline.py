@@ -9,11 +9,17 @@ from typing import Iterable, Tuple
 import numpy as np
 
 from packagefiles.PackageExtract.DETR_BGA import DETR_BGA
-from packagefiles.PackageExtract.function_tool import empty_folder, set_Image_size
+from packagefiles.PackageExtract.function_tool import (
+    empty_folder,
+    find_list,
+    recite_data,
+    set_Image_size,
+)
 from packagefiles.PackageExtract.onnx_use import Run_onnx_det
 from packagefiles.PackageExtract.yolox_onnx_py.onnx_QFP_pairs_data_location2 import (
     begain_output_pairs_data_location,
 )
+from packagefiles.PackageExtract import get_pairs_data_present5_test as _pairs_module
 
 
 # 默认需要处理的视图顺序，保持与原流程一致。
@@ -219,3 +225,418 @@ def get_data_location_by_yolo_dbnet(
 
     # 返回与旧流程一致的 L3 数据结构，方便直接替换原有实现。
     return L3
+
+
+def remove_other_annotations(L3):
+    """F4.6：剔除 YOLO/DBNet 输出中的 OTHER 类型框。"""
+
+    for view in ("top", "bottom", "side", "detailed"):
+        yolox_key = f"{view}_yolox_num"
+        dbnet_key = f"{view}_dbnet_data"
+        other_key = f"{view}_other"
+
+        yolox_num = find_list(L3, yolox_key)
+        dbnet_data = find_list(L3, dbnet_key)
+        other_data = find_list(L3, other_key)
+
+        filtered_yolox = _pairs_module.delete_other(other_data, yolox_num)
+        filtered_dbnet = _pairs_module.delete_other(other_data, dbnet_data)
+
+        recite_data(L3, yolox_key, filtered_yolox)
+        recite_data(L3, dbnet_key, filtered_dbnet)
+
+    return L3
+
+
+def enrich_pairs_with_lines(L3, image_root: str, test_mode: int):
+    """F4.6：为尺寸线补齐对应的标尺界限。"""
+
+    empty_data = np.empty((0, 13))
+    for view in ("top", "bottom", "side", "detailed"):
+        yolox_pairs = find_list(L3, f"{view}_yolox_pairs")
+        img_path = os.path.join(image_root, f"{view}.jpg")
+
+        if os.path.exists(img_path):
+            pairs_length = _pairs_module.find_pairs_length(img_path, yolox_pairs, test_mode)
+        else:
+            pairs_length = empty_data
+
+        recite_data(L3, f"{view}_yolox_pairs_length", pairs_length)
+
+    return L3
+
+
+def preprocess_pairs_and_text(L3, key: int):
+    """F4.7：整理尺寸线与文本，生成初始配对候选。"""
+
+    top_yolox_pairs = find_list(L3, "top_yolox_pairs")
+    bottom_yolox_pairs = find_list(L3, "bottom_yolox_pairs")
+    side_yolox_pairs = find_list(L3, "side_yolox_pairs")
+    detailed_yolox_pairs = find_list(L3, "detailed_yolox_pairs")
+    top_dbnet_data = find_list(L3, "top_dbnet_data")
+    bottom_dbnet_data = find_list(L3, "bottom_dbnet_data")
+    side_dbnet_data = find_list(L3, "side_dbnet_data")
+    detailed_dbnet_data = find_list(L3, "detailed_dbnet_data")
+
+    (
+        top_yolox_pairs,
+        bottom_yolox_pairs,
+        side_yolox_pairs,
+        detailed_yolox_pairs,
+        top_yolox_pairs_copy,
+        bottom_yolox_pairs_copy,
+        side_yolox_pairs_copy,
+        detailed_yolox_pairs_copy,
+        top_dbnet_data_all,
+        bottom_dbnet_data_all,
+    ) = _pairs_module.get_better_data_1(
+        top_yolox_pairs,
+        bottom_yolox_pairs,
+        side_yolox_pairs,
+        detailed_yolox_pairs,
+        key,
+        top_dbnet_data,
+        bottom_dbnet_data,
+        side_dbnet_data,
+        detailed_dbnet_data,
+    )
+
+    recite_data(L3, "top_yolox_pairs", top_yolox_pairs)
+    recite_data(L3, "bottom_yolox_pairs", bottom_yolox_pairs)
+    recite_data(L3, "side_yolox_pairs", side_yolox_pairs)
+    recite_data(L3, "detailed_yolox_pairs", detailed_yolox_pairs)
+    recite_data(L3, "top_dbnet_data", top_dbnet_data)
+    recite_data(L3, "bottom_dbnet_data", bottom_dbnet_data)
+    recite_data(L3, "side_dbnet_data", side_dbnet_data)
+    recite_data(L3, "detailed_dbnet_data", detailed_dbnet_data)
+    recite_data(L3, "top_yolox_pairs_copy", top_yolox_pairs_copy)
+    recite_data(L3, "bottom_yolox_pairs_copy", bottom_yolox_pairs_copy)
+    recite_data(L3, "side_yolox_pairs_copy", side_yolox_pairs_copy)
+    recite_data(L3, "detailed_yolox_pairs_copy", detailed_yolox_pairs_copy)
+    recite_data(L3, "top_dbnet_data_all", top_dbnet_data_all)
+    recite_data(L3, "bottom_dbnet_data_all", bottom_dbnet_data_all)
+
+    return L3
+
+
+def run_svtr_ocr(L3):
+    """F4.7：执行 SVTR OCR 推理，将文本候选加入 L3。"""
+
+    top_dbnet_data_all = find_list(L3, "top_dbnet_data_all")
+    bottom_dbnet_data_all = find_list(L3, "bottom_dbnet_data_all")
+    side_dbnet_data = find_list(L3, "side_dbnet_data")
+    detailed_dbnet_data = find_list(L3, "detailed_dbnet_data")
+
+    _, _, top_ocr_data, bottom_ocr_data, side_ocr_data, detailed_ocr_data = _pairs_module.SVTR(
+        top_dbnet_data_all,
+        bottom_dbnet_data_all,
+        side_dbnet_data,
+        detailed_dbnet_data,
+    )
+
+    recite_data(L3, "top_ocr_data", top_ocr_data)
+    recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
+    recite_data(L3, "side_ocr_data", side_ocr_data)
+    recite_data(L3, "detailed_ocr_data", detailed_ocr_data)
+
+    return L3
+
+
+def normalize_ocr_candidates(L3, key: int):
+    """F4.7：OCR 文本后处理，规整最大/中值/最小候选。"""
+
+    top_dbnet_data = find_list(L3, "top_dbnet_data")
+    bottom_dbnet_data = find_list(L3, "bottom_dbnet_data")
+    side_dbnet_data = find_list(L3, "side_dbnet_data")
+    detailed_dbnet_data = find_list(L3, "detailed_dbnet_data")
+    top_ocr_data = find_list(L3, "top_ocr_data")
+    bottom_ocr_data = find_list(L3, "bottom_ocr_data")
+    side_ocr_data = find_list(L3, "side_ocr_data")
+    detailed_ocr_data = find_list(L3, "detailed_ocr_data")
+    top_yolox_num = find_list(L3, "top_yolox_num")
+    bottom_yolox_num = find_list(L3, "bottom_yolox_num")
+    side_yolox_num = find_list(L3, "side_yolox_num")
+    detailed_yolox_num = find_list(L3, "detailed_yolox_num")
+
+    (
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+    ) = _pairs_module.data_wrangling(
+        key,
+        top_dbnet_data,
+        bottom_dbnet_data,
+        side_dbnet_data,
+        detailed_dbnet_data,
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+        top_yolox_num,
+        bottom_yolox_num,
+        side_yolox_num,
+        detailed_yolox_num,
+    )
+
+    recite_data(L3, "top_ocr_data", top_ocr_data)
+    recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
+    recite_data(L3, "side_ocr_data", side_ocr_data)
+    recite_data(L3, "detailed_ocr_data", detailed_ocr_data)
+
+    return L3
+
+
+def extract_pin_serials(L3, package_classes: str):
+    """F4.8：提取序号/PIN 相关信息，兼容 BGA/QFP 等封装。"""
+
+    top_yolox_serial_num = find_list(L3, "top_yolox_serial_num")
+    bottom_yolox_serial_num = find_list(L3, "bottom_yolox_serial_num")
+    top_ocr_data = find_list(L3, "top_ocr_data")
+    bottom_ocr_data = find_list(L3, "bottom_ocr_data")
+
+    if package_classes in {"QFP", "QFN", "SOP", "SON"}:
+        (
+            top_serial_numbers_data,
+            bottom_serial_numbers_data,
+            top_ocr_data,
+            bottom_ocr_data,
+        ) = _pairs_module.find_PIN(
+            top_yolox_serial_num,
+            bottom_yolox_serial_num,
+            top_ocr_data,
+            bottom_ocr_data,
+        )
+
+        recite_data(L3, "top_serial_numbers_data", top_serial_numbers_data)
+        recite_data(L3, "bottom_serial_numbers_data", bottom_serial_numbers_data)
+        recite_data(L3, "top_ocr_data", top_ocr_data)
+        recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
+
+    if package_classes == "BGA":
+        bottom_BGA_serial_number = find_list(L3, "bottom_BGA_serial_num")
+        bottom_BGA_serial_letter = find_list(L3, "bottom_BGA_serial_letter")
+
+        (
+            bottom_BGA_serial_number,
+            bottom_BGA_serial_letter,
+            bottom_ocr_data,
+        ) = _pairs_module.find_BGA_PIN(
+            bottom_BGA_serial_number,
+            bottom_BGA_serial_letter,
+            bottom_ocr_data,
+        )
+
+        serial_numbers_data = np.empty((0, 4))
+        for item in bottom_BGA_serial_number:
+            mid = np.empty(5)
+            mid[0:4] = item["location"].astype(str)
+            mid[4] = item["key_info"][0]
+            serial_numbers_data = np.r_[serial_numbers_data, [mid]]
+
+        serial_letters_data = np.empty((0, 4))
+        for item in bottom_BGA_serial_letter:
+            mid = np.empty(5)
+            mid[0:4] = item["location"].astype(str)
+            mid[4] = item["key_info"][0]
+            serial_letters_data = np.r_[serial_letters_data, [mid]]
+
+        (
+            pin_num_x_serial,
+            pin_num_y_serial,
+            pin_1_location,
+        ) = _pairs_module.find_pin_num_pin_1(
+            serial_numbers_data,
+            serial_letters_data,
+            bottom_BGA_serial_number,
+            bottom_BGA_serial_letter,
+        )
+
+        recite_data(L3, "bottom_BGA_serial_num", bottom_BGA_serial_number)
+        recite_data(L3, "bottom_BGA_serial_letter", bottom_BGA_serial_letter)
+        recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
+        recite_data(L3, "pin_num_x_serial", pin_num_x_serial)
+        recite_data(L3, "pin_num_y_serial", pin_num_y_serial)
+        recite_data(L3, "pin_1_location", pin_1_location)
+
+    return L3
+
+
+def match_pairs_with_text(L3, key: int):
+    """F4.8：将尺寸线与 OCR 文本重新配对。"""
+
+    top_yolox_pairs = find_list(L3, "top_yolox_pairs")
+    bottom_yolox_pairs = find_list(L3, "bottom_yolox_pairs")
+    side_yolox_pairs = find_list(L3, "side_yolox_pairs")
+    detailed_yolox_pairs = find_list(L3, "detailed_yolox_pairs")
+    side_angle_pairs = find_list(L3, "side_angle_pairs")
+    detailed_angle_pairs = find_list(L3, "detailed_angle_pairs")
+    top_border = find_list(L3, "top_border")
+    bottom_border = find_list(L3, "bottom_border")
+    top_ocr_data = find_list(L3, "top_ocr_data")
+    bottom_ocr_data = find_list(L3, "bottom_ocr_data")
+    side_ocr_data = find_list(L3, "side_ocr_data")
+    detailed_ocr_data = find_list(L3, "detailed_ocr_data")
+
+    (
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+    ) = _pairs_module.MPD(
+        key,
+        top_yolox_pairs,
+        bottom_yolox_pairs,
+        side_yolox_pairs,
+        detailed_yolox_pairs,
+        side_angle_pairs,
+        detailed_angle_pairs,
+        top_border,
+        bottom_border,
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+    )
+
+    recite_data(L3, "top_ocr_data", top_ocr_data)
+    recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
+    recite_data(L3, "side_ocr_data", side_ocr_data)
+    recite_data(L3, "detailed_ocr_data", detailed_ocr_data)
+
+    return L3
+
+
+def finalize_pairs(L3):
+    """F4.8：清理配对结果，输出最终可用的尺寸线集合。"""
+
+    top_ocr_data = find_list(L3, "top_ocr_data")
+    bottom_ocr_data = find_list(L3, "bottom_ocr_data")
+    side_ocr_data = find_list(L3, "side_ocr_data")
+    detailed_ocr_data = find_list(L3, "detailed_ocr_data")
+    top_yolox_pairs_length = find_list(L3, "top_yolox_pairs_length")
+    bottom_yolox_pairs_length = find_list(L3, "bottom_yolox_pairs_length")
+    side_yolox_pairs_length = find_list(L3, "side_yolox_pairs_length")
+    detailed_yolox_pairs_length = find_list(L3, "detailed_yolox_pairs_length")
+    top_yolox_pairs_copy = find_list(L3, "top_yolox_pairs_copy")
+    bottom_yolox_pairs_copy = find_list(L3, "bottom_yolox_pairs_copy")
+    side_yolox_pairs_copy = find_list(L3, "side_yolox_pairs_copy")
+    detailed_yolox_pairs_copy = find_list(L3, "detailed_yolox_pairs_copy")
+
+    (
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+        yolox_pairs_top,
+        yolox_pairs_bottom,
+        yolox_pairs_side,
+        yolox_pairs_detailed,
+    ) = _pairs_module.get_better_data_2(
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+        top_yolox_pairs_length,
+        bottom_yolox_pairs_length,
+        side_yolox_pairs_length,
+        detailed_yolox_pairs_length,
+        top_yolox_pairs_copy,
+        bottom_yolox_pairs_copy,
+        side_yolox_pairs_copy,
+        detailed_yolox_pairs_copy,
+    )
+
+    recite_data(L3, "top_ocr_data", top_ocr_data)
+    recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
+    recite_data(L3, "side_ocr_data", side_ocr_data)
+    recite_data(L3, "detailed_ocr_data", detailed_ocr_data)
+    recite_data(L3, "yolox_pairs_top", yolox_pairs_top)
+    recite_data(L3, "yolox_pairs_bottom", yolox_pairs_bottom)
+    recite_data(L3, "yolox_pairs_side", yolox_pairs_side)
+    recite_data(L3, "yolox_pairs_detailed", yolox_pairs_detailed)
+
+    print("***/数据整理结果/***")
+    print("top视图数据整理结果:\n", *top_ocr_data, sep="\n")
+    print("bottom视图数据整理结果:\n", *bottom_ocr_data, sep="\n")
+    print("side视图数据整理结果:\n", *side_ocr_data, sep="\n")
+    print("detailed视图数据整理结果:\n", *detailed_ocr_data, sep="\n")
+
+    return L3
+
+
+def compute_qfp_parameters(L3):
+    """F4.9：根据配对结果计算 QFP/BGA 参数列表。"""
+
+    top_serial_numbers_data = find_list(L3, "top_serial_numbers_data")
+    bottom_serial_numbers_data = find_list(L3, "bottom_serial_numbers_data")
+    top_ocr_data = find_list(L3, "top_ocr_data")
+    bottom_ocr_data = find_list(L3, "bottom_ocr_data")
+    side_ocr_data = find_list(L3, "side_ocr_data")
+    detailed_ocr_data = find_list(L3, "detailed_ocr_data")
+    yolox_pairs_top = find_list(L3, "yolox_pairs_top")
+    yolox_pairs_bottom = find_list(L3, "yolox_pairs_bottom")
+    top_yolox_pairs_length = find_list(L3, "top_yolox_pairs_length")
+    bottom_yolox_pairs_length = find_list(L3, "bottom_yolox_pairs_length")
+    top_border = find_list(L3, "top_border")
+    bottom_border = find_list(L3, "bottom_border")
+
+    nx, ny = _pairs_module.get_serial(top_serial_numbers_data, bottom_serial_numbers_data)
+    body_x, body_y = _pairs_module.get_QFP_body(
+        yolox_pairs_top,
+        top_yolox_pairs_length,
+        yolox_pairs_bottom,
+        bottom_yolox_pairs_length,
+        top_border,
+        bottom_border,
+        top_ocr_data,
+        bottom_ocr_data,
+    )
+    _pairs_module.get_QFP_body(
+        yolox_pairs_top,
+        top_yolox_pairs_length,
+        yolox_pairs_bottom,
+        bottom_yolox_pairs_length,
+        top_border,
+        bottom_border,
+        top_ocr_data,
+        bottom_ocr_data,
+    )
+
+    QFP_parameter_list = _pairs_module.get_QFP_parameter_list(
+        top_ocr_data,
+        bottom_ocr_data,
+        side_ocr_data,
+        detailed_ocr_data,
+        body_x,
+        body_y,
+    )
+    QFP_parameter_list = _pairs_module.resort_parameter_list_2(QFP_parameter_list)
+
+    if len(QFP_parameter_list[4]["maybe_data"]) > 1:
+        high = _pairs_module.get_QFP_high(QFP_parameter_list[4]["maybe_data"])
+        if len(high) > 0:
+            QFP_parameter_list[4]["maybe_data"] = high
+            QFP_parameter_list[4]["maybe_data_num"] = len(high)
+
+    if (
+        len(QFP_parameter_list[5]["maybe_data"]) > 1
+        or len(QFP_parameter_list[6]["maybe_data"]) > 1
+    ):
+        pitch_x, pitch_y = _pairs_module.get_QFP_pitch(
+            QFP_parameter_list[5]["maybe_data"],
+            body_x,
+            body_y,
+            nx,
+            ny,
+        )
+        if len(pitch_x) > 0:
+            QFP_parameter_list[5]["maybe_data"] = pitch_x
+            QFP_parameter_list[5]["maybe_data_num"] = len(pitch_x)
+        if len(pitch_y) > 0:
+            QFP_parameter_list[6]["maybe_data"] = pitch_y
+            QFP_parameter_list[6]["maybe_data_num"] = len(pitch_y)
+
+    QFP_parameter_list = _pairs_module.resort_parameter_list_2(QFP_parameter_list)
+
+    return QFP_parameter_list, nx, ny
