@@ -4745,7 +4745,8 @@ def filter_ocr_data_0(ocr_data):
 
 # 应用规则 -1 对 OCR 数据进行过滤。
 def filter_ocr_data__1(ocr_data):
-
+    # 删除标注关键信息检测识别为空
+    #
     new_ocr_data = []
     for i in range(len(ocr_data)):
         if not (ocr_data[i]['key_info'] == []):

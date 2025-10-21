@@ -1,36 +1,55 @@
 # YOLOX ONNX 公共函数整理
 
-本文档梳理 `packagefiles/PackageExtract/yolox_onnx_py/` 目录下各推理脚本中反复出现的辅助函数，便于后续重构时识别可抽取的公共模块。统计基于当前仓库中的脚本内容。
+在梳理 `packagefiles/PackageExtract/yolox_onnx_py/` 目录的脚本时，发现多份 YOLOX ONNX 推理代码重复维护相同的预处理、后处理与可视化逻辑。本次重构已将这些基础函数集中到 `yolox_onnx_py/yolox_onnx_shared.py`，方便统一维护，本文档同步记录相关函数职责与使用方式。
 
 ## 统计口径
-- 通过遍历 `yolox_onnx_py` 文件夹下的所有 `.py` 文件，记录顶层定义的函数名。
-- 若同名函数出现在至少两个脚本内，则归入“公共函数”列表。
-- 结合代码逐一说明函数职责及在 F4.6-F4.9 流程中的作用。 
+- 遍历 `yolox_onnx_py` 文件夹下的全部 `.py` 脚本，收集顶层函数定义。
+- 若函数在两个及以上脚本中复用，则归入“公共函数”列表，并说明它们在 F4.6-F4.9 流程中的定位。
 
-## 公共函数清单
+## 公共模块 `yolox_onnx_shared.py`
+`yolox_onnx_shared.py` 汇总了 YOLOX 推理的通用工具函数，脚本可按下面的方式复用（兼容包内导入与单脚本执行）：
 
-| 函数名 | 主要职责 | 常见出现文件（节选） | F4.6-F4.9 相关说明 |
-| --- | --- | --- | --- |
-| `make_parser` | 构建命令行参数解析器，约定 ONNX 模型、输入图片与输出目录路径。 | `onnx_QFP_pairs_data_location2.py`、`onnx_output_other_location.py`、`onnx_detect_pin.py` 等 | 统一不同检测脚本的启动方式，便于批量调用模型完成标尺、引脚、外框等推理。 |
-| `mkdir` | 保证输出目录存在，避免保存可视化/结果时出错。 | 同上 | 运行 YOLO/ONNX 推理前准备输出目录，常用于保存 F4.6-F4.9 阶段的调试图片。 |
-| `preprocess` | 将输入图片缩放、填充并转换成 YOLOX 期望的张量格式。 | 同上 | F4 阶段所有检测模型进入推理前均依赖该预处理逻辑。 |
-| `nms` | 执行单类别非极大抑制，去除重叠检测框。 | 同上 | F4.6-F4.9 中的检测模型（引脚、标尺、外框等）都通过该函数筛选候选框。 |
-| `multiclass_nms` | 根据 `class_agnostic` 标志选择类别无关或类别敏感的多类别 NMS。 | 同上 | 抽象封装多类别后处理，保证不同检测脚本对 NMS 的调用一致。 |
-| `multiclass_nms_class_agnostic` | 类别无关的多类别 NMS 实现。 | 同上 | 主要用于多数只有单类别输出的模型，简化后处理。 |
-| `multiclass_nms_class_aware` | 类别敏感的多类别 NMS 实现。 | 同上 | 针对存在多个标签（如文字、引脚类型）的模型，保留类别信息。 |
-| `demo_postprocess` | 将输出张量映射回原始图像尺度，生成真实坐标。 | 同上 | 连接 ONNX 推理输出与实际几何信息的桥梁，是 F4 阶段获取坐标数据的关键。 |
-| `onnx_inference` | 加载 ONNXRuntime Session 并执行模型推理，返回原始输出。 | `onnx_QFP_pairs_data_location2.py`、`onnx_output_bottom_body_location.py` 等 | 所有 YOLOX 模型统一的推理入口。 |
-| `output_pairs_data_location` | 结合 `onnx_inference`、`demo_postprocess` 与 NMS，将检测框转换为结构化结果。 | 同上 | F4.6-F4.9 中多类几何元素（标尺、Pin、外框、侧视 standoff 等）的最终输出接口。 |
-| `get_img_info` | 计算图像尺寸、缩放比例等信息，支撑后续坐标还原。 | `onnx_QFP_pairs_data_location2.py`、`onnx_output_pin_num4.py` 等 | 在根据缩放比例反推真实坐标时使用。 |
-| `vis` | 将检测框绘制回原图，输出调试图像。 | 同上 | 便于验证 F4.6-F4.9 检测结果，常作为调试选项。 |
-| `get_rotate_crop_image` | 根据四点坐标裁剪旋转区域，常用于序号/文字检测后的补裁。 | `onnx_output_serial_number_letter_location.py`、`onnx_output_pin_num4.py` 等 | 支撑 F4.7-F4.8 的 OCR 前裁剪及几何精修。 |
-| `find_the_only_body` | 在多候选框中选出面积最大的“本体”框，避免重复。 | `onnx_output_bottom_body_location.py`、`onnx_output_other_location.py` 等 | 用于 body、外框等检测，保证流程只保留最合理的本体候选。 |
-| `onnx_output_pairs_data_pin_5` | （仅 `onnx_detect_pin.py` 与 `onnx_yolox检测模板.py`）封装 PIN 检测输出逻辑。 | `onnx_detect_pin.py`、`onnx_yolox检测模板.py` | 供 F4.6/F4.7 的 PIN 位置识别脚本调用。 |
+```python
+try:
+    from packagefiles.PackageExtract.yolox_onnx_py.yolox_onnx_shared import (
+        demo_postprocess,
+        mkdir,
+        multiclass_nms,
+        preprocess,
+        vis,
+    )
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    from yolox_onnx_shared import (
+        demo_postprocess,
+        mkdir,
+        multiclass_nms,
+        preprocess,
+        vis,
+    )
+```
 
-> **注**：以上列表覆盖所有在两个及以上脚本中复用的函数。若某些脚本另有特定后处理逻辑（如序号排序、特定字段写入），则未纳入“公共函数”范畴。
+| 函数名 | 主要职责 | F4.6-F4.9 相关说明 |
+| --- | --- | --- |
+| `mkdir` / `ensure_dir` | 保证输出目录存在，避免保存可视化/结果时出错。 | 推理前创建结果目录，常用于保存调试图片与中间输出。 |
+| `preprocess` | 将输入图片缩放、填充并转换成 YOLOX 期望的张量格式。 | 所有 YOLOX ONNX 模型进入推理前的统一预处理。 |
+| `nms` | 执行单类别非极大抑制，去除重叠检测框。 | 对标尺、引脚、外框等检测结果进行去重。 |
+| `multiclass_nms` / `multiclass_nms_class_agnostic` / `multiclass_nms_class_aware` | 多类别 NMS 封装，根据 `class_agnostic` 标志切换类别无关/类别敏感模式。 | 确保不同检测脚本共享一致的多类别后处理策略。 |
+| `demo_postprocess` | 将模型输出映射回原始图像尺度，生成真实坐标。 | 连接 ONNX 推理输出与实际几何数据的关键环节。 |
+| `vis` | 将检测框绘制回原图，输出调试图像。 | 便于核对 F4.6-F4.9 阶段的检测结果与标注。 |
+
+## 仍在各脚本内维护的共通逻辑
+部分函数与业务模型高度耦合（如单脚本特有的 `onnx_inference`、`output_pairs_data_location`、`find_the_only_body` 等），暂保留在原文件中，后续重构可视具体需求再行抽取。下表列出其中复用频率较高的代表：
+
+| 函数名 | 常见出现文件（节选） | 说明 |
+| --- | --- | --- |
+| `onnx_inference` | `onnx_QFP_pairs_data_location2.py`、`onnx_output_bottom_body_location.py` 等 | 建立 ONNXRuntime Session 并执行推理，是各检测脚本的入口封装。 |
+| `output_pairs_data_location` | 与上同 | 结合推理输出、NMS、类别后处理，转换为业务字段。 |
+| `get_img_info` | `onnx_QFP_pairs_data_location2.py`、`onnx_output_pin_num4.py` 等 | 读取图像宽高信息，为比例还原与边界判断提供支持。 |
+| `get_rotate_crop_image` | `onnx_output_serial_number_letter_location.py`、`onnx_output_pin_num4.py` 等 | 根据四点坐标裁剪旋转区域，供 OCR 或精细化处理使用。 |
+| `find_the_only_body` | `onnx_output_bottom_body_location.py`、`onnx_output_other_location.py` | 在多候选框中挑选最合理的封装本体。 |
 
 ## 后续建议
-1. **抽取公共模块**：可将上述函数移动到独立的工具模块（如 `yolox_utils.py`），减少每个推理脚本中的重复定义。
-2. **统一参数约定**：整理 `make_parser` 默认参数，将模型路径、输入尺寸等配置集中化，方便批量部署与测试。
-3. **完善文档**：结合 F4.6-F4.9 的业务流程，在 `F4_onnx_method_notes.md` 等文档中引用本表格，快速定位依赖的通用能力。
+1. **统一参数约定**：在 `make_parser` 等入口函数中收敛默认模型路径与输入尺寸，避免脚本间默认值漂移。
+2. **持续抽查复用点**：若后续新增脚本出现与 `yolox_onnx_shared.py` 重复的处理逻辑，优先回填到公共模块中，保持推理行为一致。
+3. **配套文档同步**：与 `F4_onnx_method_notes.md` 等说明文件互相引用本表内容，确保重构后的依赖关系清晰可查。
 

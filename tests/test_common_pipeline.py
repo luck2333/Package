@@ -20,6 +20,8 @@ except ModuleNotFoundError:  # pragma: no cover
         return _to_matrix(data, dtype=dtype)
 
     def empty(shape):
+        if isinstance(shape, int):
+            return [0.0 for _ in range(shape)]
         rows, cols = shape
         return [[0.0 for _ in range(cols)] for _ in range(rows)]
 
@@ -70,7 +72,209 @@ def _stub_set_image_size(_src, _dst):
 
 fake_function_tool_module.empty_folder = _stub_empty_folder
 fake_function_tool_module.set_Image_size = _stub_set_image_size
+
+
+def _stub_find_list(dict_list, listname):
+    for item in dict_list:
+        if item.get("list_name") == listname:
+            return item.get("list")
+    return []
+
+
+def _stub_recite_data(dict_list, listname, value):
+    for item in dict_list:
+        if item.get("list_name") == listname:
+            item["list"] = value
+            break
+    else:
+        dict_list.append({"list_name": listname, "list": value})
+    return dict_list
+
+
+fake_function_tool_module.find_list = _stub_find_list
+fake_function_tool_module.recite_data = _stub_recite_data
 sys.modules["packagefiles.PackageExtract.function_tool"] = fake_function_tool_module
+
+
+fake_pairs_module = types.ModuleType("packagefiles.PackageExtract.get_pairs_data_present5_test")
+
+
+def _return_original(_other, data):
+    return data
+
+
+def _stub_find_pairs_length(_img_path, _pairs, _test_mode):
+    return np.empty((0, 13))
+
+
+def _stub_get_better_data_1(
+    top_pairs,
+    bottom_pairs,
+    side_pairs,
+    detailed_pairs,
+    _key,
+    top_dbnet,
+    bottom_dbnet,
+    side_dbnet,
+    detailed_dbnet,
+):
+    return (
+        top_pairs,
+        bottom_pairs,
+        side_pairs,
+        detailed_pairs,
+        top_pairs,
+        bottom_pairs,
+        side_pairs,
+        detailed_pairs,
+        top_dbnet,
+        bottom_dbnet,
+    )
+
+
+def _stub_svtr(top_dbnet_all, bottom_dbnet_all, side_dbnet, detailed_dbnet):
+    return (0.0, 0.0, top_dbnet_all, bottom_dbnet_all, side_dbnet, detailed_dbnet)
+
+
+def _stub_data_wrangling(
+    _key,
+    top_dbnet,
+    bottom_dbnet,
+    side_dbnet,
+    detailed_dbnet,
+    top_ocr,
+    bottom_ocr,
+    side_ocr,
+    detailed_ocr,
+    _top_num,
+    _bottom_num,
+    _side_num,
+    _detailed_num,
+):
+    return top_ocr, bottom_ocr, side_ocr, detailed_ocr
+
+
+def _stub_find_pin(top_serial, bottom_serial, top_ocr, bottom_ocr):
+    empty = np.empty((0, 5))
+    return empty, empty, top_ocr, bottom_ocr
+
+
+def _stub_find_bga_pin(bottom_serial_num, bottom_serial_letter, bottom_ocr):
+    return bottom_serial_num, bottom_serial_letter, bottom_ocr
+
+
+def _stub_find_pin_num_pin_1(_serial_numbers_data, _serial_letters_data, _serial_numbers, _serial_letters):
+    return 0, 0, np.array([0, 0])
+
+
+def _stub_mpd(
+    _key,
+    top_pairs,
+    bottom_pairs,
+    side_pairs,
+    detailed_pairs,
+    _side_angle,
+    _detailed_angle,
+    _top_border,
+    _bottom_border,
+    top_ocr,
+    bottom_ocr,
+    side_ocr,
+    detailed_ocr,
+):
+    return top_ocr, bottom_ocr, side_ocr, detailed_ocr
+
+
+def _stub_get_better_data_2(
+    top_ocr,
+    bottom_ocr,
+    side_ocr,
+    detailed_ocr,
+    _top_length,
+    _bottom_length,
+    _side_length,
+    _detailed_length,
+    top_pairs_copy,
+    bottom_pairs_copy,
+    side_pairs_copy,
+    detailed_pairs_copy,
+):
+    return (
+        top_ocr,
+        bottom_ocr,
+        side_ocr,
+        detailed_ocr,
+        top_pairs_copy,
+        bottom_pairs_copy,
+        side_pairs_copy,
+        detailed_pairs_copy,
+    )
+
+
+def _stub_get_serial(_top_serial, _bottom_serial):
+    return 0, 0
+
+
+def _stub_get_qfp_body(
+    _top_pairs,
+    _top_length,
+    _bottom_pairs,
+    _bottom_length,
+    _top_border,
+    _bottom_border,
+    _top_ocr,
+    _bottom_ocr,
+):
+    return 0.0, 0.0
+
+
+def _stub_get_qfp_parameter_list(_top, _bottom, _side, _detailed, _body_x, _body_y):
+    base = []
+    for _ in range(19):
+        base.append({"maybe_data": [], "maybe_data_num": 0})
+    return base
+
+
+def _stub_resort_parameter_list(data):
+    return data
+
+
+def _stub_get_qfp_high(values):
+    return values
+
+
+def _stub_get_qfp_pitch(_values, _body_x, _body_y, _nx, _ny):
+    return [], []
+
+
+def _stub_get_qfp_parameter_data(_parameter_list, _nx, _ny):
+    return [["", "", "", ""] for _ in range(19)]
+
+
+def _stub_alter_qfp_parameter_data(parameter_list):
+    return parameter_list
+
+
+fake_pairs_module.delete_other = _return_original
+fake_pairs_module.find_pairs_length = _stub_find_pairs_length
+fake_pairs_module.get_better_data_1 = _stub_get_better_data_1
+fake_pairs_module.SVTR = _stub_svtr
+fake_pairs_module.data_wrangling = _stub_data_wrangling
+fake_pairs_module.find_PIN = _stub_find_pin
+fake_pairs_module.find_BGA_PIN = _stub_find_bga_pin
+fake_pairs_module.find_pin_num_pin_1 = _stub_find_pin_num_pin_1
+fake_pairs_module.MPD = _stub_mpd
+fake_pairs_module.get_better_data_2 = _stub_get_better_data_2
+fake_pairs_module.get_serial = _stub_get_serial
+fake_pairs_module.get_QFP_body = _stub_get_qfp_body
+fake_pairs_module.get_QFP_parameter_list = _stub_get_qfp_parameter_list
+fake_pairs_module.resort_parameter_list_2 = _stub_resort_parameter_list
+fake_pairs_module.get_QFP_high = _stub_get_qfp_high
+fake_pairs_module.get_QFP_pitch = _stub_get_qfp_pitch
+fake_pairs_module.get_QFP_parameter_data = _stub_get_qfp_parameter_data
+fake_pairs_module.alter_QFP_parameter_data = _stub_alter_qfp_parameter_data
+sys.modules["packagefiles.PackageExtract.get_pairs_data_present5_test"] = fake_pairs_module
+
 
 fake_yolox_package = types.ModuleType("packagefiles.PackageExtract.yolox_onnx_py")
 fake_yolox_module = types.ModuleType(
@@ -298,6 +502,106 @@ class GetDataLocationTest(unittest.TestCase):
         self.assertTrue(np.array_equal(result[9]["list"], dbnet_bottom))
         self.assertTrue(np.array_equal(result[-2]["list"], yolox_bottom[9]))
         self.assertTrue(np.array_equal(result[-1]["list"], yolox_bottom[8]))
+
+
+class PipelineStepFunctionTest(unittest.TestCase):
+    """验证新抽取的流程步骤函数是否保持原始语义。"""
+
+    def test_remove_other_annotations_updates_each_view(self):
+        """delete_other 应被调用并写回四个视图的结果。"""
+
+        L3 = [
+            {"list_name": "top_yolox_num", "list": "top_num"},
+            {"list_name": "top_dbnet_data", "list": "top_db"},
+            {"list_name": "top_other", "list": "top_other"},
+            {"list_name": "bottom_yolox_num", "list": "bottom_num"},
+            {"list_name": "bottom_dbnet_data", "list": "bottom_db"},
+            {"list_name": "bottom_other", "list": "bottom_other"},
+            {"list_name": "side_yolox_num", "list": "side_num"},
+            {"list_name": "side_dbnet_data", "list": "side_db"},
+            {"list_name": "side_other", "list": "side_other"},
+            {"list_name": "detailed_yolox_num", "list": "detail_num"},
+            {"list_name": "detailed_dbnet_data", "list": "detail_db"},
+            {"list_name": "detailed_other", "list": "detail_other"},
+        ]
+
+        with patch(
+            "packagefiles.PackageExtract.common_pipeline._pairs_module.delete_other",
+            side_effect=lambda other, data: f"{data}-filtered",
+        ) as mock_delete_other:
+            updated = common_pipeline.remove_other_annotations(L3)
+
+        self.assertEqual(common_pipeline.find_list(updated, "top_yolox_num"), "top_num-filtered")
+        self.assertEqual(common_pipeline.find_list(updated, "top_dbnet_data"), "top_db-filtered")
+        self.assertEqual(common_pipeline.find_list(updated, "bottom_yolox_num"), "bottom_num-filtered")
+        self.assertEqual(common_pipeline.find_list(updated, "side_dbnet_data"), "side_db-filtered")
+        self.assertEqual(common_pipeline.find_list(updated, "detailed_yolox_num"), "detail_num-filtered")
+        self.assertEqual(mock_delete_other.call_count, 8)
+
+    def test_enrich_pairs_with_lines_reads_existing_images(self):
+        """存在图片的视图应调用 find_pairs_length 并写入 L3。"""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for view in ("top", "bottom"):
+                open(os.path.join(tmpdir, f"{view}.jpg"), "wb").close()
+
+            L3 = [
+                {"list_name": "top_yolox_pairs", "list": "top_pairs"},
+                {"list_name": "bottom_yolox_pairs", "list": "bottom_pairs"},
+                {"list_name": "side_yolox_pairs", "list": "side_pairs"},
+                {"list_name": "detailed_yolox_pairs", "list": "detail_pairs"},
+            ]
+
+            fake_result = np.array([[1.0] * 13])
+
+            with patch(
+                "packagefiles.PackageExtract.common_pipeline._pairs_module.find_pairs_length",
+                return_value=fake_result,
+            ) as mock_find_pairs_length:
+                updated = common_pipeline.enrich_pairs_with_lines(L3, tmpdir, test_mode=1)
+
+        self.assertTrue(np.array_equal(common_pipeline.find_list(updated, "top_yolox_pairs_length"), fake_result))
+        self.assertTrue(
+            np.array_equal(
+                common_pipeline.find_list(updated, "side_yolox_pairs_length"),
+                np.empty((0, 13)),
+            )
+        )
+        self.assertEqual(mock_find_pairs_length.call_count, 2)
+
+    def test_extract_pin_serials_handles_bga_branch(self):
+        """BGA 模式应调用 find_BGA_PIN 并写入序号信息。"""
+
+        L3 = [
+            {"list_name": "top_yolox_serial_num", "list": []},
+            {"list_name": "bottom_yolox_serial_num", "list": []},
+            {"list_name": "top_ocr_data", "list": []},
+            {"list_name": "bottom_ocr_data", "list": ["raw"]},
+            {"list_name": "bottom_BGA_serial_num", "list": ["initial_num"]},
+            {"list_name": "bottom_BGA_serial_letter", "list": ["initial_letter"]},
+        ]
+
+        with patch(
+            "packagefiles.PackageExtract.common_pipeline._pairs_module.find_BGA_PIN",
+            return_value=(
+                [],
+                [],
+                ["ocr"],
+            ),
+        ) as mock_find_bga_pin, patch(
+            "packagefiles.PackageExtract.common_pipeline._pairs_module.find_pin_num_pin_1",
+            return_value=(10, 12, [1, 2]),
+        ) as mock_find_pin_num_pin_1:
+            updated = common_pipeline.extract_pin_serials(L3, "BGA")
+
+        self.assertEqual(common_pipeline.find_list(updated, "bottom_BGA_serial_num"), [])
+        self.assertEqual(common_pipeline.find_list(updated, "bottom_BGA_serial_letter"), [])
+        self.assertEqual(common_pipeline.find_list(updated, "bottom_ocr_data"), ["ocr"])
+        self.assertEqual(common_pipeline.find_list(updated, "pin_num_x_serial"), 10)
+        self.assertEqual(common_pipeline.find_list(updated, "pin_num_y_serial"), 12)
+        self.assertEqual(common_pipeline.find_list(updated, "pin_1_location"), [1, 2])
+        mock_find_bga_pin.assert_called_once()
+        mock_find_pin_num_pin_1.assert_called_once()
 
 
 if __name__ == "__main__":
