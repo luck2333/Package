@@ -1,3 +1,5 @@
+"""YOLOX ONNX OTHER 类检测脚本。"""
+
 import argparse
 import os
 import cv2
@@ -6,6 +8,7 @@ import onnxruntime
 from math import sqrt
 
 def make_parser(img_path):
+    """构建命令行参数解析器，配置模型与输入输出路径。"""
     parser = argparse.ArgumentParser("onnxruntime inference sample")
     parser.add_argument(
         "-m",
@@ -45,10 +48,12 @@ def make_parser(img_path):
 
 # yolox_onnx 需要的一些函数(从yolox中提取)
 def mkdir(path):
+    """创建目录，保证推理结果输出位置存在。"""
     if not os.path.exists(path):
         os.makedirs(path)
 
 def preprocess(img, input_size, swap=(2, 0, 1)):
+    """按比例缩放并填充图像，适配 YOLOX 输入。"""
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
@@ -67,7 +72,7 @@ def preprocess(img, input_size, swap=(2, 0, 1)):
     return padded_img, r
 
 def nms(boxes, scores, nms_thr):
-    """Single class NMS implemented in Numpy."""
+    """执行单类别 NMS，去除高重叠度的冗余框。"""
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
@@ -96,7 +101,7 @@ def nms(boxes, scores, nms_thr):
     return keep
 
 def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
-    """Multiclass NMS implemented in Numpy"""
+    """根据类别策略执行多类别 NMS。"""
     if class_agnostic:
         nms_method = multiclass_nms_class_agnostic
     else:
@@ -104,7 +109,7 @@ def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
     return nms_method(boxes, scores, nms_thr, score_thr)
 
 def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-aware version."""
+    """类别敏感的多类别 NMS 实现。"""
     final_dets = []
     num_classes = scores.shape[1]
     for cls_ind in range(num_classes):
@@ -127,7 +132,7 @@ def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
     return np.concatenate(final_dets, 0)
 
 def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-agnostic version."""
+    """类别无关的多类别 NMS 实现。"""
     cls_inds = scores.argmax(1)
     cls_scores = scores[np.arange(len(cls_inds)), cls_inds]
 
@@ -145,6 +150,7 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
     return dets
 
 def demo_postprocess(outputs, img_size, p6=False):
+    """将预测结果映射回输入图片的尺度。"""
     grids = []
     expanded_strides = []
     strides = [8, 16, 32] if not p6 else [8, 16, 32, 64]
@@ -167,6 +173,7 @@ def demo_postprocess(outputs, img_size, p6=False):
     return outputs
 
 def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
+    """在图像上绘制检测框与标签，方便调试。"""
     _COLORS = np.array(
         [
             0.000, 0.447, 0.741,
@@ -283,6 +290,7 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
     return img
 
 def get_img_info(img_path):
+    """读取图片尺寸信息并返回宽高。"""
 
     image = cv2.imread(img_path)
     size = image.shape
@@ -291,6 +299,7 @@ def get_img_info(img_path):
     print(w,h)
     return w, h
 def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有函数,from utils import get_rotate_crop_image
+    """依据四点坐标裁剪旋转矩形区域。"""
     '''
     img_height, img_width = img.shape[0:2]
     left = int(np.min(points[:, 0]))
@@ -324,6 +333,7 @@ def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有�
     #     dst_img = np.rot90(dst_img)
     return dst_img
 def find_the_only_body(img_path):
+    """在检测结果中定位唯一外框。"""
     global location
     global YOLOX_body
     print(location)
@@ -379,6 +389,7 @@ def find_the_only_body(img_path):
         cv2.waitKey(0)
     return YOLOX_body
 def onnx_inference(img_path):
+    """执行 ONNX 模型推理并整理检测结果。"""
     VOC_CLASSES = ('package', "bga", "qfn", "Form", "Note")
     args = make_parser(img_path).parse_args()
 
@@ -435,6 +446,7 @@ def onnx_inference(img_path):
     cv2.imwrite(output_path, origin_img)
 
 def output_pairs_data_location(cls, bboxes):
+    """拆分模型输出，生成业务需要的坐标集合。"""
     # print("cls",cls)#tensor([1., 1., 1., 1., 1., 1., 0., 0., 0., 0., 0., 0.])
     # print("bboxes",bboxes)#(x1,y1,x2,y2)左上角与右下角坐标，yolox坐标原点是左上角
     # tensor([[ 781.2277,  311.5244,  820.7728,  350.0395],
@@ -470,6 +482,7 @@ def output_pairs_data_location(cls, bboxes):
                 num += 1
                 location = np.r_[location, [bboxes_np[i]]]
 def begain_output_other_location(img_path):
+    """封装入口：输出 OTHER 类检测结果。"""
     global OTHER
     global GUANGJIEDU
 

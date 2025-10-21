@@ -1,4 +1,6 @@
 # 4版本，先yolox检测出pinmap位置防止误检，通过裁剪bottom图为几份，分别检测ball并最后合并结果
+"""YOLOX ONNX 引脚数量检测与 PinMap 生成脚本。"""
+
 # 问题：换行问题：以解决
 # 问题：如何结束循环：目前测试的图片均已结束循环
 # 局部缺整行整列pin时，会报错：已解决
@@ -20,6 +22,7 @@ import math
 
 
 def make_parser(img_path, conf):
+    """构建命令行参数解析器，配置模型与输入输出路径。"""
     parser = argparse.ArgumentParser("onnxruntime inference sample")
     parser.add_argument(
         "-m",
@@ -138,11 +141,13 @@ def ResizeImage_137_4(filein, fileout):
 
 # yolox_onnx 需要的一些函数(从yolox中提取)
 def mkdir(path):
+    """创建目录，保证推理结果输出位置存在。"""
     if not os.path.exists(path):
         os.makedirs(path)
 
 
 def preprocess(img, input_size, swap=(2, 0, 1)):
+    """按比例缩放并填充图像，适配 YOLOX 输入。"""
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
@@ -162,7 +167,7 @@ def preprocess(img, input_size, swap=(2, 0, 1)):
 
 
 def nms(boxes, scores, nms_thr):
-    """Single class NMS implemented in Numpy."""
+    """执行单类别 NMS，去除高重叠度的冗余框。"""
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
@@ -192,7 +197,7 @@ def nms(boxes, scores, nms_thr):
 
 
 def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
-    """Multiclass NMS implemented in Numpy"""
+    """根据类别策略执行多类别 NMS。"""
     if class_agnostic:
         nms_method = multiclass_nms_class_agnostic
     else:
@@ -201,7 +206,7 @@ def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
 
 
 def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-aware version."""
+    """类别敏感的多类别 NMS 实现。"""
     final_dets = []
     num_classes = scores.shape[1]
     for cls_ind in range(num_classes):
@@ -225,7 +230,7 @@ def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
 
 
 def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-agnostic version."""
+    """类别无关的多类别 NMS 实现。"""
     cls_inds = scores.argmax(1)
     cls_scores = scores[np.arange(len(cls_inds)), cls_inds]
 
@@ -244,6 +249,7 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
 
 
 def demo_postprocess(outputs, img_size, p6=False):
+    """将预测结果映射回输入图片的尺度。"""
     grids = []
     expanded_strides = []
     strides = [8, 16, 32] if not p6 else [8, 16, 32, 64]
@@ -267,6 +273,7 @@ def demo_postprocess(outputs, img_size, p6=False):
 
 
 def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
+    """在图像上绘制检测框与标签，方便调试。"""
     _COLORS = np.array(
         [
             0.000, 0.447, 0.741,
@@ -385,6 +392,7 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
 
 
 def get_img_info(img_path):
+    """读取图片尺寸信息并返回宽高。"""
     image = cv2.imread(img_path)
     size = image.shape
     w = size[1]  # 宽度
@@ -394,6 +402,7 @@ def get_img_info(img_path):
 
 
 def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有函数,from utils import get_rotate_crop_image
+    """依据四点坐标裁剪旋转矩形区域。"""
     '''
     img_height, img_width = img.shape[0:2]
     left = int(np.min(points[:, 0]))
@@ -429,6 +438,7 @@ def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有�
 
 
 def find_the_only_body(img_path):
+    """在检测结果中定位唯一外框。"""
     global location
     global YOLOX_body
     print(location)
@@ -487,6 +497,7 @@ def find_the_only_body(img_path):
 
 
 def onnx_inference(img_path, conf):
+    """执行 ONNX 模型推理并整理检测结果。"""
     VOC_CLASSES = ('1', "2", "3", "4", "5", "6", "7", "8", "9")
     args = make_parser(img_path, conf).parse_args()
 
@@ -533,6 +544,7 @@ def onnx_inference(img_path, conf):
 
 
 def output_pin_num(cls, bboxes):
+    """整理 PIN 数量检测结果并输出。"""
     #########################################输出识别的类别和对角线坐标
 
     # cls_np = np.array(cls)
@@ -970,6 +982,7 @@ def output_pin_num(cls, bboxes):
 ##################################################################问题：没有矫正环节，有些误检测的pin的干扰没有消除
 
 def get_np_array_in_txt(file_path):  # 提取txt中保存的数组，要求：浮点数且用逗号隔开
+    """读取 txt 中保存的 numpy 数组。"""
 
     with open(file_path) as f:
         line = f.readline()
@@ -988,6 +1001,7 @@ def get_np_array_in_txt(file_path):  # 提取txt中保存的数组，要求：�
 
 
 def crop_img_save(path_img, path_crop, x_min, y_min, x_max, y_max):
+    """按照坐标裁剪图像并落盘。"""
     img = cv2.imread(path_img)
     if y_min < 0:
         y_min = 1
@@ -997,6 +1011,7 @@ def crop_img_save(path_img, path_crop, x_min, y_min, x_max, y_max):
 
 
 def empty_folder(folder_path):
+    """清空文件夹中的临时文件。"""
     try:
         shutil.rmtree(folder_path)
     except FileNotFoundError:
@@ -1004,6 +1019,7 @@ def empty_folder(folder_path):
 
 
 def output_pairs_data_location(cls, bboxes):
+    """拆分模型输出，生成业务需要的坐标集合。"""
     # print("cls",cls)#tensor([1., 1., 1., 1., 1., 1., 0., 0., 0., 0., 0., 0.])
     # print("bboxes",bboxes)#(x1,y1,x2,y2)左上角与右下角坐标，yolox坐标原点是左上角
     # tensor([[ 781.2277,  311.5244,  820.7728,  350.0395],
@@ -1040,10 +1056,12 @@ def output_pairs_data_location(cls, bboxes):
 
 
 def begain_output_pin_num(img_path, conf):
+    """封装入口：推理并返回 PIN 数量及相关信息。"""
     onnx_inference(img_path, conf)
 
 
 def show_lost_pin_when_full(pin, pin_num_x, pin_num_y, average_x_pitch, average_y_pitch, pin_x, pin_y):
+    """调试函数：展示缺失 PIN 的推断。"""
     #***************old
     pin_map = np.zeros((pin_num_y, pin_num_x), dtype=int)
     min_x = 9999999
@@ -1245,6 +1263,7 @@ def show_lost_pin_when_full(pin, pin_num_x, pin_num_y, average_x_pitch, average_
 
 
 def when_pin_num_big_15():
+    """处理引脚数大于 15 的特殊逻辑。"""
     show_img_key = 0  # 是否显示过程图片，用来检查错误
     test_no = 0  # test图的编号
     no_key = 10  # 每次检测的最大行列数
@@ -1887,6 +1906,7 @@ def when_pin_num_big_15():
 
 
 def resize_pinmap(pin_x_num, pin_y_num, filein, fileout):
+    """调整 pinmap 图像大小。"""
     img = Image.open(filein)
     # pin排列为10*10的图片分辨率为137最合适，因此将pinmap分辨率调整为max（pin_x_num，pin_y_num）*137/10
     height_1, width_1 = img.size[0], img.size[1]
@@ -1903,6 +1923,7 @@ def resize_pinmap(pin_x_num, pin_y_num, filein, fileout):
 
 
 def resize_pinmap_200(filein, fileout):
+    """将 pinmap 调整为宽度 200。"""
     img = Image.open(filein)
     height_1, width_1 = img.size[0], img.size[1]
     width = int(500)
@@ -1918,6 +1939,7 @@ def resize_pinmap_200(filein, fileout):
 
 
 def manual_get_boxes(folder_path, save_path, save_name):
+    """手动标注检测框以辅助调试。"""
     # 定义文件夹路径和保存路径
     global rect_list
     # 获取文件夹内所有图片文件
@@ -1969,6 +1991,7 @@ def manual_get_boxes(folder_path, save_path, save_name):
 
 
 def begain_output_pin_num_pin_map():
+    """封装入口：输出 pinmap 相关资源。"""
     pin_output = 0  # 是否在此py中输出了pin图
     pin_num_key = 15  # 设置pin行列数大于多少采用分割法
     # 保存存pinmap

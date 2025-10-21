@@ -1,3 +1,9 @@
+"""YOLOX ONNX 标尺/引脚定位工具集。
+
+封装 pairs、引脚、外框等检测模型的推理与后处理逻辑，
+为 F4.6-F4.9 流程提供必要的几何输入。
+"""
+
 import argparse
 import os
 import cv2
@@ -7,6 +13,7 @@ from math import sqrt
 
 
 def make_parser(img_path, weight):
+    """构建命令行参数解析器，设置模型与输入输出路径。"""
     output_path = r'Result/Package_extract/onnx_output/'
 
     parser = argparse.ArgumentParser("onnxruntime inference sample")
@@ -49,11 +56,13 @@ def make_parser(img_path, weight):
 
 # yolox_onnx 需要的一些函数(从yolox中提取)
 def mkdir(path):
+    """确保输出目录存在。"""
     if not os.path.exists(path):
         os.makedirs(path)
 
 
 def preprocess(img, input_size, swap=(2, 0, 1)):
+    """缩放并填充图像，转换为模型输入张量。"""
     if len(img.shape) == 3:
         padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
     else:
@@ -73,7 +82,7 @@ def preprocess(img, input_size, swap=(2, 0, 1)):
 
 
 def nms(boxes, scores, nms_thr):
-    """Single class NMS implemented in Numpy."""
+    """执行单类别 NMS，剔除重叠框。"""
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
     x2 = boxes[:, 2]
@@ -103,7 +112,7 @@ def nms(boxes, scores, nms_thr):
 
 
 def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
-    """Multiclass NMS implemented in Numpy"""
+    """根据是否同类合并选择 NMS 策略。"""
     if class_agnostic:
         nms_method = multiclass_nms_class_agnostic
     else:
@@ -112,7 +121,7 @@ def multiclass_nms(boxes, scores, nms_thr, score_thr, class_agnostic=True):
 
 
 def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-aware version."""
+    """类别敏感的多类别 NMS 实现。"""
     final_dets = []
     num_classes = scores.shape[1]
     for cls_ind in range(num_classes):
@@ -136,7 +145,7 @@ def multiclass_nms_class_aware(boxes, scores, nms_thr, score_thr):
 
 
 def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
-    """Multiclass NMS implemented in Numpy. Class-agnostic version."""
+    """类别无关的多类别 NMS 实现。"""
     cls_inds = scores.argmax(1)
     cls_scores = scores[np.arange(len(cls_inds)), cls_inds]
 
@@ -155,6 +164,7 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
 
 
 def demo_postprocess(outputs, img_size, p6=False):
+    """把预测结果映射回输入图片的尺度。"""
     grids = []
     expanded_strides = []
     strides = [8, 16, 32] if not p6 else [8, 16, 32, 64]
@@ -178,6 +188,7 @@ def demo_postprocess(outputs, img_size, p6=False):
 
 
 def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
+    """在图片上绘制检测框与标签。"""
     _COLORS = np.array(
         [
             0.000, 0.447, 0.741,
@@ -295,6 +306,7 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
 
 
 def get_img_info(img_path):
+    """读取图片尺寸信息，返回宽高。"""
     image = cv2.imread(img_path)
     size = image.shape
     w = size[1]  # 宽度
@@ -303,6 +315,7 @@ def get_img_info(img_path):
 
 
 def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有函数,from utils import get_rotate_crop_image
+    """根据四点坐标截取旋转矩形区域。"""
     '''
     img_height, img_width = img.shape[0:2]
     left = int(np.min(points[:, 0]))
@@ -338,6 +351,7 @@ def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有�
 
 
 def find_the_only_body(img_path):
+    """根据检测结果挑选唯一的封装外框。"""
     global location
     global YOLOX_body
     print(location)
@@ -396,6 +410,7 @@ def find_the_only_body(img_path):
 
 
 def onnx_inference(img_path, package_classes, weight):
+    """根据封装类型执行 YOLOX 推理并返回分类后的检测结果。"""
     # VOC_CLASSES = ('Border', 'Pad', 'Pin', 'angle', 'multi_value_1', 'multi_value_2', 'multi_value_3', 'multi_value_4',
     #                'multi_value_angle', 'multi_value_thickness', 'multi_value_triangle', 'other', 'pairs_inSide_col',
     #                'pairs_inSide_row', 'pairs_inSide_thickness', 'pairs_outSide_col', 'pairs_outSide_row', 'plane',
@@ -493,6 +508,7 @@ def onnx_inference(img_path, package_classes, weight):
 
 
 def output_pairs_data_location(cls, bboxes, package_classes):
+    """整理模型输出，拆分为各类业务关键坐标。"""
     #########################################输出识别的类别和对角线坐标#############################################################
 
     # print("cls",cls)#tensor([1., 1., 1., 1., 1., 1., 0., 0., 0., 0., 0., 0.])
@@ -844,6 +860,7 @@ def output_pairs_data_location(cls, bboxes, package_classes):
 
 
 def begain_output_pairs_data_location(img_path, package_classes):
+    """封装入口：执行推理并返回 pairs/引脚/外框信息。"""
     global YOLOX_num  # np.二维数组[x1,y1,x2,y2]
     global YOLOX_pairs_single  # np.二维数组[x1,y1,x2,y2,0 = outside 1 = inside]
     global YOLOX_other

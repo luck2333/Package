@@ -1,10 +1,15 @@
 
 # 外部文件：
+import os
+
+import numpy as np
+
+from packagefiles.PackageExtract.common_pipeline import (
+    get_data_location_by_yolo_dbnet,
+    prepare_workspace,
+)
 from packagefiles.PackageExtract.function_tool import *
 from packagefiles.PackageExtract.get_pairs_data_present5_test import *
-from packagefiles.PackageExtract.onnx_use import Run_onnx_det, Run_onnx
-from packagefiles.PackageExtract.yolox_onnx_py.onnx_QFP_pairs_data_location2 import begain_output_pairs_data_location
-from packagefiles.PackageExtract.DETR_BGA import DETR_BGA
 import json
 #全局路径
 DATA = 'Result/Package_extract/data'
@@ -17,7 +22,13 @@ OPENCV_OUTPUT = 'Result/Package_extract/opencv_output'
 
 def extract_package(package_classes, page_num):
     # 完成图片大小固定、清空建立文件夹等各种操作
-    front_loading_work()
+    prepare_workspace(
+        DATA,
+        DATA_COPY,
+        DATA_BOTTOM_CROP,
+        ONNX_OUTPUT,
+        OPENCV_OUTPUT,
+    )
     test_mode = 0  # 0: 正常模式，1: 测试模式
     key = test_mode
     '''
@@ -205,237 +216,6 @@ def extract_package(package_classes, page_num):
     new_parameter_list.append(parameter_list[13])
     return new_parameter_list
 
-def front_loading_work():
-    """
-    预处理，将data文件夹中的所有文件复制到data_copy文件夹中,同时清空上一个封装的数据
-    :return:
-    """
-
-    # 1.初始化文件夹
-    # 清空文件夹
-    empty_folder(ONNX_OUTPUT)
-    # 创建文件夹
-    os.makedirs(ONNX_OUTPUT)
-    # 清空文件夹
-    empty_folder(DATA_BOTTOM_CROP)
-    # 创建文件夹
-    os.makedirs(DATA_BOTTOM_CROP)
-    '''
-    这里将分割好的视图放入data文件夹即可提取QFP
-    '''
-
-    # 2.将分割好的三视图备份
-    # 固定三视图的尺寸，并增强画质规定最长的一边为1000
-    filein = f'{DATA}/top.jpg'
-    fileout = filein
-    try:
-        set_Image_size(filein, fileout)
-    except:
-        print('文件', filein, '不存在')
-    filein = f'{DATA}/bottom.jpg'
-    fileout = filein
-    try:
-        set_Image_size(filein, fileout)
-    except:
-        print('文件', filein, '不存在')
-    filein = f'{DATA}/side.jpg'
-    fileout = filein
-    try:
-        set_Image_size(filein, fileout)
-    except:
-        print('文件', filein, '不存在')
-    filein = f'{DATA}/detailed.jpg'
-    fileout = filein
-    try:
-        set_Image_size(filein, fileout)
-    except:
-        print('文件', filein, '不存在')
-
-    # 清空文件夹
-    empty_folder(DATA_COPY)
-    # 创建文件夹
-    os.makedirs(DATA_COPY)
-    filePath = DATA
-    file_name_list = os.listdir(filePath)
-    for file_name in file_name_list:
-        shutil.copy(f'{DATA}/{file_name}', f'{DATA_COPY}/{file_name}')
-
-    empty_folder(OPENCV_OUTPUT)
-    os.makedirs(OPENCV_OUTPUT)
-    # 清空文件夹
-    empty_folder(DATA)
-    # 创建文件夹
-    os.makedirs(DATA)
-    filePath = DATA_COPY
-    file_name_list = os.listdir(filePath)
-    for file_name in file_name_list:
-        shutil.copy(f'{DATA_COPY}/{file_name}', f'{DATA}/{file_name}')
-
-
-
-    # 2.检测图像中的文本信息和图像信息
-def opencv_get_outline(package_path):
-    """
-    使用OPENCV提取器件外框线
-    :param package_path: data 文件夹所在路径，包含分割好的每个视图
-    :return: 外框线
-    """
-
-def dbnet_get_text_box(img_path):
-    """
-    DBNet提取所有文本框坐标范围
-    :param img_path: data 图片所在路径
-    :return: 包含所有文本框坐标范围(外框)
-    """
-    location_cool = Run_onnx_det(img_path)
-    dbnet_data = np.empty((len(location_cool), 4))  # [x1,x2,x3,x4]
-    for i in range(len(location_cool)):
-        dbnet_data[i][0] = min(location_cool[i][2], location_cool[i][0])
-        dbnet_data[i][1] = min(location_cool[i][3], location_cool[i][1])
-        dbnet_data[i][2] = max(location_cool[i][2], location_cool[i][0])
-        dbnet_data[i][3] = max(location_cool[i][3], location_cool[i][1])
-
-    dbnet_data = np.around(dbnet_data, decimals=2)
-
-    return dbnet_data
-
-def yolo_classify(img_path, package_classes):
-    """
-    Yolo分类，并提取图像元素坐标范围
-    :param img_path: data 图片所在路径
-    :return: yolox_pairs:标尺线的坐标范围(外框),yolox_num:尺寸标注的坐标范围(外框),yolox_serial_num:行列序号的坐标范围(外框),pin:pin的坐标范围(外框),other:无关图像元素的坐标范围(外框),pad:散热盘的坐标范围(外框),border:本体外框的坐标范围(外框), angle_pairs:角度标尺线的坐标范围(外框)
-    """
-    if package_classes == 'BGA':
-        yolox_pairs, yolox_num, yolox_serial_num, pin, other, pad, border, angle_pairs, BGA_serial_num, BGA_serial_letter = begain_output_pairs_data_location(
-            img_path, package_classes)
-        # yolox_pairs, yolox_num, yolox_serial_num, pin, other, pad, border, angle_pairs, BGA_serial_num, BGA_serial_letter = DETR_BGA(img_path, package_classes)
-        yolox_pairs_null, yolox_num_null, yolox_serial_num_null, pin, other_null, pad_null, border, angle_pairs_null, BGA_serial_num, BGA_serial_letter = DETR_BGA(img_path, package_classes)
-        print("yolox_pairs", yolox_pairs)
-        print("yolox_num", yolox_num)
-        print("yolox_serial_num", yolox_serial_num)
-        print("pin", pin)
-        print("other", other)
-        print("pad", pad)
-        print("border", border)
-        print("angle_pairs", angle_pairs)
-        print("BGA_serial_num", BGA_serial_num)
-        print("BGA_serial_letter", BGA_serial_letter)
-
-    else:
-        yolox_pairs, yolox_num, yolox_serial_num, pin, other, pad, border, angle_pairs,BGA_serial_num, BGA_serial_letter = begain_output_pairs_data_location(
-            img_path, package_classes)
-
-        yolox_pairs = np.around(yolox_pairs, decimals=2)
-        yolox_num = np.around(yolox_num, decimals=2)
-        angle_pairs = np.around(angle_pairs, decimals=2)
-
-    return yolox_pairs, yolox_num, yolox_serial_num, pin, other, pad, border, angle_pairs, BGA_serial_num, BGA_serial_letter
-
-
-def get_data_location_by_yolo_dbnet(package_path, package_classes):
-    """
-    使用Yolo和DBNet提取各个视图的图像元素和文本的的坐标范围(外框)
-    :param package_path: data 文件夹所在路径，包含分割好的每个视图
-    :return: L3:包含所有图像元素和文本的坐标范围(外框)集合
-    """
-    L3 = []
-    empty_data = np.empty((0, 4))
-    img_path = f'{package_path}/top.jpg'
-    if not os.path.exists(img_path):
-        top_dbnet_data = empty_data
-        top_yolox_pairs = empty_data
-        top_yolox_num = empty_data
-        top_yolox_serial_num = empty_data
-        top_pin = empty_data
-        top_other = empty_data
-        top_pad = empty_data
-        top_border = empty_data
-        top_angle_pairs = empty_data
-    else:
-        top_dbnet_data = dbnet_get_text_box(img_path)
-        top_yolox_pairs, top_yolox_num, top_yolox_serial_num, top_pin, top_other, top_pad, top_border, top_angle_pairs, top_BGA_serial_num, top_BGA_serial_letter = yolo_classify(img_path, package_classes)
-    img_path = f'{package_path}/bottom.jpg'
-    if not os.path.exists(img_path):
-        bottom_dbnet_data = empty_data
-        bottom_yolox_pairs = empty_data
-        bottom_yolox_num = empty_data
-        bottom_yolox_serial_num = empty_data
-        bottom_pin = empty_data
-        bottom_other = empty_data
-        bottom_pad = empty_data
-        bottom_border = empty_data
-        bottom_angle_pairs = empty_data
-    else:
-        bottom_dbnet_data = dbnet_get_text_box(img_path)
-        bottom_yolox_pairs, bottom_yolox_num, bottom_yolox_serial_num, bottom_pin, bottom_other, bottom_pad, bottom_border, bottom_angle_pairs, bottom_BGA_serial_num, bottom_BGA_serial_letter = yolo_classify(img_path, package_classes)
-    img_path = f'{package_path}/side.jpg'
-    if not os.path.exists(img_path):
-        side_dbnet_data = empty_data
-        side_yolox_pairs = empty_data
-        side_yolox_num = empty_data
-        side_yolox_serial_num = empty_data
-        side_pin = empty_data
-        side_other = empty_data
-        side_pad = empty_data
-        side_border = empty_data
-        side_angle_pairs = empty_data
-    else:
-        side_dbnet_data = dbnet_get_text_box(img_path)
-        side_yolox_pairs, side_yolox_num, side_yolox_serial_num, side_pin, side_other, side_pad, side_border, side_angle_pairs, side_BGA_serial_num, side_BGA_serial_letter = yolo_classify(img_path, package_classes)
-    img_path = f'{package_path}/detailed.jpg'
-    if not os.path.exists(img_path):
-        detailed_dbnet_data = empty_data
-        detailed_yolox_pairs = empty_data
-        detailed_yolox_num = empty_data
-        detailed_yolox_serial_num = empty_data
-        detailed_pin = empty_data
-        detailed_other = empty_data
-        detailed_pad = empty_data
-        detailed_border = empty_data
-        detailed_angle_pairs = empty_data
-    else:
-        detailed_dbnet_data = dbnet_get_text_box(img_path)
-        detailed_yolox_pairs, detailed_yolox_num, detailed_yolox_serial_num, detailed_pin, detailed_other, detailed_pad, detailed_border, detailed_angle_pairs, detailed_BGA_serial_num, detailed_BGA_serial_letter = yolo_classify(img_path, package_classes)
-    # 将所有列表添加到L3中
-    L3.append({'list_name': 'top_dbnet_data', 'list': top_dbnet_data})
-    L3.append({'list_name': 'top_yolox_pairs', 'list': top_yolox_pairs})
-    L3.append({'list_name': 'top_yolox_num', 'list': top_yolox_num})
-    L3.append({'list_name': 'top_yolox_serial_num', 'list': top_yolox_serial_num})
-    L3.append({'list_name': 'top_pin', 'list': top_pin})
-    L3.append({'list_name': 'top_other', 'list': top_other})
-    L3.append({'list_name': 'top_pad', 'list': top_pad})
-    L3.append({'list_name': 'top_border', 'list': top_border})
-    L3.append({'list_name': 'top_angle_pairs', 'list': top_angle_pairs})
-    L3.append({'list_name': 'bottom_dbnet_data', 'list': bottom_dbnet_data})
-    L3.append({'list_name': 'bottom_yolox_pairs', 'list': bottom_yolox_pairs})
-    L3.append({'list_name': 'bottom_yolox_num', 'list': bottom_yolox_num})
-    L3.append({'list_name': 'bottom_yolox_serial_num', 'list': bottom_yolox_serial_num})
-    L3.append({'list_name': 'bottom_pin', 'list': bottom_pin})
-    L3.append({'list_name': 'bottom_other', 'list': bottom_other})
-    L3.append({'list_name': 'bottom_pad', 'list': bottom_pad})
-    L3.append({'list_name': 'bottom_border', 'list': bottom_border})
-    L3.append({'list_name': 'bottom_angle_pairs', 'list': bottom_angle_pairs})
-    L3.append({'list_name': 'bottom_BGA_serial_letter', 'list': bottom_BGA_serial_letter})
-    L3.append({'list_name': 'bottom_BGA_serial_num', 'list': bottom_BGA_serial_num})
-    L3.append({'list_name': 'side_dbnet_data', 'list': side_dbnet_data})
-    L3.append({'list_name': 'side_yolox_pairs', 'list': side_yolox_pairs})
-    L3.append({'list_name': 'side_yolox_num', 'list': side_yolox_num})
-    L3.append({'list_name': 'side_yolox_serial_num', 'list': side_yolox_serial_num})
-    L3.append({'list_name': 'side_pin', 'list': side_pin})
-    L3.append({'list_name': 'side_other', 'list': side_other})
-    L3.append({'list_name': 'side_pad', 'list': side_pad})
-    L3.append({'list_name': 'side_border', 'list': side_border})
-    L3.append({'list_name': 'side_angle_pairs', 'list': side_angle_pairs})
-    L3.append({'list_name': 'detailed_dbnet_data', 'list': detailed_dbnet_data})
-    L3.append({'list_name': 'detailed_yolox_pairs', 'list': detailed_yolox_pairs})
-    L3.append({'list_name': 'detailed_yolox_num', 'list': detailed_yolox_num})
-    L3.append({'list_name': 'detailed_yolox_serial_num', 'list': detailed_yolox_serial_num})
-    L3.append({'list_name': 'detailed_pin', 'list': detailed_pin})
-    L3.append({'list_name': 'detailed_other', 'list': detailed_other})
-    L3.append({'list_name': 'detailed_pad', 'list': detailed_pad})
-    L3.append({'list_name': 'detailed_border', 'list': detailed_border})
-    L3.append({'list_name': 'detailed_angle_pairs', 'list': detailed_angle_pairs})
-    return L3
 
 
 def data_delete_other(L3):
