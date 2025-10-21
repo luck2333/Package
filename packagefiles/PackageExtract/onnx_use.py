@@ -7,6 +7,7 @@
 
 import os
 import sys
+from pathlib import Path
 import matplotlib.pyplot as plt
 sys.path.append('ocr_onnx')
 import cv2
@@ -17,6 +18,12 @@ import numpy as np
 import pyclipper
 from shapely.geometry import Polygon
 from PIL import Image,ImageDraw
+
+try:
+    from packagefiles.model_paths import ocr_model_path
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    def ocr_model_path(*parts):
+        return str(Path(__file__).resolve().parents[2] / 'model' / 'ocr_model' / Path(*parts))
 
 
 # PalldeOCR 检测模块 需要用到的图片预处理类
@@ -349,16 +356,16 @@ class det_rec_functions(object):
     def __init__(self, image, use_large=False):
         """初始化检测与识别模型会话，并缓存输入图像。"""
         self.img = image.copy()
-        self.det_file = 'model/ocr_model/onnx_det/0529det_model.onnx'
-        self.small_rec_file = 'model/ocr_model/onnx_rec/package_rec_model.onnx'
-        self.large_rec_file = 'model/ocr_model/onnx_rec/package_rec_model.onnx'
+        self.det_file = ocr_model_path('onnx_det', '0529det_model.onnx')
+        self.small_rec_file = ocr_model_path('onnx_rec', 'package_rec_model.onnx')
+        self.large_rec_file = ocr_model_path('onnx_rec', 'package_rec_model.onnx')
         self.onet_det_session = onnxruntime.InferenceSession(self.det_file)
         if use_large:
             self.onet_rec_session = onnxruntime.InferenceSession(self.large_rec_file)
         else:
             self.onet_rec_session = onnxruntime.InferenceSession(self.small_rec_file)
         self.infer_before_process_op, self.det_re_process_op = self.get_process()
-        self.postprocess_op = process_pred('model/ocr_model/rec_dict.txt', 'en', True)
+        self.postprocess_op = process_pred(ocr_model_path('rec_dict.txt'), 'en', True)
 
     ## 图片预处理过程
     def transform(self, data, ops=None):

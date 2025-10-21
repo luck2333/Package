@@ -5,8 +5,17 @@ import os
 import numpy as np
 
 from packagefiles.PackageExtract.common_pipeline import (
+    compute_qfp_parameters,
+    enrich_pairs_with_lines,
+    extract_pin_serials,
+    finalize_pairs,
     get_data_location_by_yolo_dbnet,
+    match_pairs_with_text,
+    normalize_ocr_candidates,
     prepare_workspace,
+    preprocess_pairs_and_text,
+    remove_other_annotations,
+    run_svtr_ocr,
 )
 from packagefiles.PackageExtract.function_tool import *
 from packagefiles.PackageExtract.get_pairs_data_present5_test import *
@@ -46,28 +55,28 @@ def extract_package(package_classes, page_num):
     L3 = get_data_location_by_yolo_dbnet(DATA, package_classes)
 
     # (2)在yolo和dbnet的标注文本框中去除OTHER类型文本框
-    L3 = data_delete_other(L3)
+    L3 = remove_other_annotations(L3)
 
     # (3)为尺寸线寻找尺寸界限
-    L3 = for_pairs_find_lines(L3, key)
+    L3 = enrich_pairs_with_lines(L3, DATA, key)
 
     # 处理数据
-    L3 = resize_data_1(L3, key)
+    L3 = preprocess_pairs_and_text(L3, key)
 
     # (4)SVTR识别标注内容
-    L3 = SVTR_get_data(L3)
+    L3 = run_svtr_ocr(L3)
 
     # (5)SVTR后处理数据
-    L3 = get_max_medium_min(L3, key)
+    L3 = normalize_ocr_candidates(L3, key)
 
     # (6)提取并分离出yolo和dbnet检测出的标注中的序号
-    L3 = get_Pin_data(L3,package_classes)
+    L3 = extract_pin_serials(L3, package_classes)
 
     # (7)匹配pairs和data
-    L3 = MPD_data(L3, key)
+    L3 = match_pairs_with_text(L3, key)
 
     # 处理数据
-    L3 = resize_data_2(L3)
+    L3 = finalize_pairs(L3)
 
     '''
         输出QFP参数
@@ -81,7 +90,7 @@ def extract_package(package_classes, page_num):
         pad_x,pad_y
     '''
     # 语义对齐
-    QFP_parameter_list, nx, ny = find_QFP_parameter(L3)
+    QFP_parameter_list, nx, ny = compute_qfp_parameters(L3)
     # 整理获得的参数
     parameter_list = get_QFP_parameter_data(QFP_parameter_list, nx, ny)
 

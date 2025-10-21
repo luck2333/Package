@@ -174,7 +174,6 @@ def output_body(img_path, name):
 
 # 结合形态学与线段检测获取图像全部水平和竖直线段。
 def find_all_lines(img_path, test_mode):
-   
     # img_path = r'data_copy/bottom.jpg'
     src_img = cv2.imread(img_path)
     src_img1 = cv2.cvtColor(src_img, cv2.COLOR_BGR2GRAY)

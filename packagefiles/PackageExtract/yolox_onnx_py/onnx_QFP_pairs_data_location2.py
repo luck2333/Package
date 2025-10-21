@@ -6,6 +6,7 @@
 
 import argparse
 import os
+from pathlib import Path
 import cv2
 import numpy as np
 import onnxruntime
@@ -17,6 +18,7 @@ try:
         preprocess,
         vis,
     )
+    from packagefiles.model_paths import yolo_model_path
 except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
     from yolox_onnx_shared import (
         demo_postprocess,
@@ -25,6 +27,8 @@ except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
         preprocess,
         vis,
     )
+    def yolo_model_path(*parts):
+        return str(Path(__file__).resolve().parents[3] / 'model' / 'yolo_model' / Path(*parts))
 
 from math import sqrt
 
@@ -660,7 +664,7 @@ def begain_output_pairs_data_location(img_path, package_classes):
         YOLOX_weight = 'BGA_0730.onnx'
     else:
         YOLOX_weight = "QFP_SOP_QFN.onnx"
-    weight_path = 'model/yolo_model/package_model/' + YOLOX_weight
+    weight_path = yolo_model_path('package_model', YOLOX_weight)
     # onnx_inference(img_path, package_classes, weight='model/yolo_model/package_model/QFP_SOP_QFN.onnx', )
     onnx_inference(img_path, package_classes, weight_path, )
 
