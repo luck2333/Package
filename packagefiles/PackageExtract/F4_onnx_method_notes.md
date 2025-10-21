@@ -1,6 +1,6 @@
 # F4.6-F4.9 阶段所依赖的 ONNX 工具函数说明
 
-本文汇总 `onnx_use.py` 与 `yolox_onnx_py/` 目录中，在流程图 F4.6-F4.9 阶段会被调用的关键函数及其职责，便于后续重构快速定位依赖关系。
+本文汇总 `onnx_use.py` 与 `yolox_onnx_py/` 目录中，在流程图 F4.6-F4.9 阶段会被调用的关键函数及其职责，便于后续重构快速定位依赖关系。公共的 YOLOX 预处理、NMS 与可视化逻辑已统一沉淀在 `yolox_onnx_py/yolox_onnx_shared.py`，各检测脚本通过导入该模块共享相同实现。
 
 ## 1. `onnx_use.py` OCR 识别辅助
 - `det_rec_functions.get_boxes(image_path, show)`：封装 DBNet 检测流程，返回按照行序排序后的文本框列表，为后续序号提取与标尺匹配提供基础几何信息。 【F:packagefiles/PackageExtract/onnx_use.py†L205-L243】
