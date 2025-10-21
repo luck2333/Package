@@ -7,6 +7,13 @@ import math
 # 第三方库
 import onnxruntime
 from shapely.geometry import Polygon
+from pathlib import Path
+
+try:
+    from packagefiles.model_paths import yolo_model_path
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    def yolo_model_path(*parts):
+        return str(Path(__file__).resolve().parents[2] / 'model' / 'yolo_model' / Path(*parts))
 
 from packagefiles.UI.watermark_remove import watermark_remove
 from packagefiles.UI.extract_package_page_list_2 import extract_package_page_list
@@ -23,7 +30,7 @@ ZOOM = (3, 3)       # pdf转图片时的放大倍数
 # VOC_CLASSES = ('package', 'BGA', 'DFN','SON', 'QFP','QFN','SOP', 'Top', 'Side', 'Detail', 'Form', 'Note')  # 标签类型
 VOC_CLASSES = ('package', 'BGA', 'DFN_SON','QFP','QFN','SOP', 'Top', 'Side', 'Detail', 'Form', 'Note')  # 3类标签类型
 INPUT_SHAPE = (640, 640)    # 图片输入大小
-MODEL = r"model/yolo_model/best_ckpt_0805.onnx"
+MODEL = yolo_model_path('package_model', 'best_ckpt_0805.onnx')
 SCORE_THR = 0.8          # 置信度
 DETECT_JSON_PATH = r"detect.json"
 TEMP_DIRECTORY = r"Result/temp"         # 临时存放pdf文件夹

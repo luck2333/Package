@@ -48,6 +48,7 @@ from packagefiles.PackageExtract.onnx_use import Run_onnx
 # from output_body import output_body
 
 
+# 在二值图像中筛选水平长条轮廓并绘制对应直线。
 def choose_x(binary):
     height, width = binary.shape[:2]
     cnt_length = []
@@ -81,6 +82,7 @@ def choose_x(binary):
     return binary_image
 
 
+# 在二值图像中筛选竖直长条轮廓并绘制对应直线。
 def choose_y(binary):
     height, width = binary.shape[:2]
     cnt_length = []
@@ -114,6 +116,7 @@ def choose_y(binary):
     return binary_image
 
 
+# 通过形态学处理提取外框轮廓并输出矩形坐标。
 def output_body(img_path, name):
     src_img = cv2.imread(img_path)
     src_img1 = cv2.cvtColor(src_img, cv2.COLOR_BGR2GRAY)
@@ -166,10 +169,8 @@ def output_body(img_path, name):
     return location
 
 
+# 结合形态学与线段检测获取图像全部水平和竖直线段。
 def find_all_lines(img_path, test_mode):
-    '''
-    找到一张图中所有的直线
-    '''
     # img_path = r'data_copy/bottom.jpg'
     src_img = cv2.imread(img_path)
     src_img1 = cv2.cvtColor(src_img, cv2.COLOR_BGR2GRAY)
@@ -226,8 +227,8 @@ def find_all_lines(img_path, test_mode):
     return syz_heng, syz_shu
 
 
+# 按照点集坐标仿射裁剪出旋转纠正后的图像块。
 def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有函数,from utils import get_rotate_crop_image
-    '''
     img_height, img_width = img.shape[0:2]
     left = int(np.min(points[:, 0]))
     right = int(np.max(points[:, 0]))
@@ -236,7 +237,7 @@ def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有�
     img_crop = img[top:bottom, left:right, :].copy()
     points[:, 0] = points[:, 0] - left
     points[:, 1] = points[:, 1] - top
-    '''
+    #
     assert len(points) == 4, "shape of points must be 4*2"
     img_crop_width = int(
         max(
@@ -258,6 +259,7 @@ def get_rotate_crop_image(img, points):  # 图片分割，在ultil中的原有�
     return dst_img
 
 
+# 封装 OCR 推理流程，按批处理图片并统计耗时。
 def ocr_get_data(image_path,
                  yolox_pairs):  # 输入yolox输出的pairs坐标和匹配的data坐标以及图片地址，ocr识别文本后输出data内容按序保存在data_list_np（numpy二维数组）
     show_img_key = 0  # 是否显示过程中ocr待检测图片 0 = 不显示，1 = 显示
@@ -513,6 +515,7 @@ def ocr_get_data(image_path,
     return data_list, data_list_np
 
 
+# 将图像缩放至指定尺寸，便于统一处理。
 def img_resize(image):
     height, width = image.shape[0], image.shape[1]
     # 设置新的图片分辨率框架
@@ -526,6 +529,7 @@ def img_resize(image):
     return img_new
 
 
+# 对输入图像进行滤波降噪以提升识别质量。
 def img_clear(img):
     img = cv2.bilateralFiler(img, 9, 75, 75)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -536,6 +540,7 @@ def img_clear(img):
     return img
 
 
+# 把字符串中的逗号替换为小数点，兼容不同格式。
 def comma_inter_point(str_data):  # 将字符串中的comma转换为point
     str_data = list(str_data)  # str不可修改，转换成list可以修改元素
     for i in range(len(str_data)):
@@ -545,6 +550,7 @@ def comma_inter_point(str_data):  # 将字符串中的comma转换为point
     return str_data
 
 
+# 删除字符串中多余的逗号字符。
 def jump_inter_comma(str_data):
     str_data = list(str_data)
     for i in range(len(str_data)):
@@ -554,6 +560,7 @@ def jump_inter_comma(str_data):
     return str_data
 
 
+# 提取字符串里的数值并清理中英文字符。
 def get_data_and_del_en(string):  # 将输入字符串，从中提取数字（含小数点），删除中英文
     # import re
     # string = "轻型车：共有198家企业4747个车型（12305个信息公开编号）15498915辆车进行了轻型车国六环保信息公开，与上周汇总环比增加105个车型、386379辆车。其中，国内生产企业177家、4217个车型、14645390辆，国外生产企业21家、530个车型、853525辆；轻型汽油"
@@ -598,6 +605,7 @@ def get_data_and_del_en(string):  # 将输入字符串，从中提取数字（�
     return str_data, str_data_another
 
 
+# 从文本文件中读取数组数据并转换为 numpy 格式。
 def get_np_array_in_txt(file_path):  # 提取txt中保存的数组，要求：浮点数且用逗号隔开
     # import numpy as np
     with open(file_path) as f:
@@ -616,12 +624,14 @@ def get_np_array_in_txt(file_path):  # 提取txt中保存的数组，要求：�
     return data_array
 
 
+# 读取文本文件中的路径字符串。
 def get_path_in_txt(image_txt_path):  # 提取txt中保存的地址作为字符串输出
     with open(image_txt_path, 'r', encoding='utf-8') as f:
         content = f.read()
     return content
 
 
+# 根据顶部和底部数据判断封装是否为正方或长方形。
 def Square_or_Rectangular(top_data, bottom_data, side_data):  # 判断矩形长宽是否一样
     key = -1  # 1是正方形，0是长方形
     down_top_data = top_data.sort(func=None, key=None, reverse=True)
@@ -645,10 +655,10 @@ def Square_or_Rectangular(top_data, bottom_data, side_data):  # 判断矩形长�
     # if down_top_data[0] == down_bottom_data[0]:
 
 
+# 从顶部检测结果中推算封装 X/Y 尺寸。
 def get_body_x_y(top_data):
-    '''
-    限定长宽的范围2，40
-    '''
+    # 限定长宽的范围2，40
+    #
     # 缺少的长或者宽按照最长尺寸线和尺寸数字规则寻找
     body_x = []
     body_y = []
@@ -731,6 +741,7 @@ def get_body_x_y(top_data):
             return body_x, body_y
 
 
+# 依据 bottom 侧数据及引脚数量计算行列间距。
 def get_pitch_x_y(bottom_data_np, pin_num_x, pin_num_y, body_x, body_y, bottom_ocr_data):  # 算出行和列的pitch值
 
     ############################1.分别在行和列pairs的data中通过不等式：长/2 < 行pitch*（行pin数量-1）< 长 来初步筛选行pitch值（有力竞争者：pin值）
@@ -980,6 +991,7 @@ def get_pitch_x_y(bottom_data_np, pin_num_x, pin_num_y, body_x, body_y, bottom_o
             return pitch_x_true, pitch_y_true, pin_num_x, pin_num_y, bottom_ocr_data
 
 
+# 在行列缺失时根据已有数据估算间距。
 def get_pitch_when_lone(bottom_data_np, pin_num_x, pin_num_y, body_x,
                         body_y):  # 当用等式匹配pitch，把行列pin作为参考量重新匹配都失败后，判断应该是没有总pitch值，此时只能用不等式匹配然后输出可能的pitch值
 
@@ -1046,6 +1058,7 @@ def get_pitch_when_lone(bottom_data_np, pin_num_x, pin_num_y, body_x,
     return pitch_x, pitch_y
 
 
+# 在最后方案阶段以 YOLO 数字框估算行列间距。
 def get_pitch_x_y_when_last_plan(yolox_num_data, pin_num_x, pin_num_y, image_path):
     yolox_num_data = np.array(yolox_num_data)
     ocr = PaddleOCR(use_angle_cls=True,
@@ -1213,6 +1226,7 @@ def get_pitch_x_y_when_last_plan(yolox_num_data, pin_num_x, pin_num_y, image_pat
         return pitch_x_true, pitch_y_true
 
 
+# 根据侧视图数据统计焊球高度范围。
 def get_high_pin_high_max_1(side_data, body_x, body_y):
     # print("side_data",side_data)
     high = np.zeros(3)
@@ -1240,6 +1254,7 @@ def get_high_pin_high_max_1(side_data, body_x, body_y):
     return high
 
 
+# 整合侧视图信息估算封装高度及最大值。
 def get_high_pin_high_max(side_data):
     # print("side_data",side_data)
     high = np.zeros(3)
@@ -1267,6 +1282,7 @@ def get_high_pin_high_max(side_data):
     return high
 
 
+# 综合三视图数据估算 PIN 直径。
 def get_pin_diameter(pitch_x, pitch_y, pin_x_number, pin_y_number, body_x, body_y, bottom_data_list_np,
                      side_data_list_np,
                      top_data_list_np):  # 从三视图中找pin直径，方法是看data的最大值和行列数减一相乘是否小于长和宽，最小值和行列数减一是否大于长和宽的一半
@@ -1348,6 +1364,7 @@ def get_pin_diameter(pitch_x, pitch_y, pin_x_number, pin_y_number, body_x, body_
     return pin_diameter  # numpy二维数组，可能不止一行
 
 
+# 以多视图信息补充 PIN 直径的冗余计算。
 def pin_diameter_1(pitch_x, pitch_y, pin_x_number, pin_y_number, body_x, body_y, bottom_data_list_np, side_data_list_np,
                    top_data_list_np, standoff, high):  # 从三视图中找pin直径，方法是看data的最大值和行列数减一相乘是否小于长和宽，最小值和行列数减一是否大于长和宽的一半
     pin_diameter = np.zeros((1, 3))  # 存储可能的pin直径值，
@@ -1434,10 +1451,10 @@ def pin_diameter_1(pitch_x, pitch_y, pin_x_number, pin_y_number, body_x, body_y,
     return pin_diameter  # numpy二维数组，可能不止一行
 
 
+# 通过侧视图数据估计 standoff 高度。
 def find_standoff(side_data_np, pin_diagonal, high):
-    '''
-    支撑高的max_medium_min的每一个数都不超过pin_diameter，且支撑高一定不等于pin_diameter
-    '''
+    # 支撑高的max_medium_min的每一个数都不超过pin_diameter，且支撑高一定不等于pin_diameter
+    #
     standoff = np.zeros((0, 3))
     for j in range(len(pin_diagonal)):
         for i in range(len(side_data_np)):
@@ -1464,10 +1481,10 @@ def find_standoff(side_data_np, pin_diagonal, high):
     return standoff
 
 
+# 在多个 standoff 候选中挑选最优值。
 def select_best_stanoff(standoff):
-    '''
-    当standoff不止一个，挑选最合适的
-    '''
+    # 当standoff不止一个，挑选最合适的
+    #
     try:
         if standoff.ndim == 2:
             if len(standoff) > 1:
@@ -1488,6 +1505,7 @@ def select_best_stanoff(standoff):
     return standoff
 
 
+# 在缺失引脚的情况下估算行列间距。
 def get_pitch_x_y_when_absence_pin(bottom_data_np, pin_num_x, pin_num_y):  # 先不引入长和宽
     if pin_num_x == 0:  # 缺整列pin时，输出列pitch值是准确的
 
@@ -1589,6 +1607,7 @@ def get_pitch_x_y_when_absence_pin(bottom_data_np, pin_num_x, pin_num_y):  # 先
     return pitch_x_true, pitch_y_true, pin_num_x, pin_num_y
 
 
+# 可视化缺失焊球位置并统计对应行列。
 def show_lost_pin(pin, pin_set, average_x_pitch, average_y_pitch, key, pin_num_x, pin_num_y):  # 先不尝试修正零散ball的影响
     try:
         # 由ball的行列最大数量建立矩阵，1表示该位置有ball，0表示没有
@@ -1619,6 +1638,7 @@ def show_lost_pin(pin, pin_set, average_x_pitch, average_y_pitch, key, pin_num_x
         print('错误明细是', e)
 
 
+# 在满阵列情况下标注缺失焊球。
 def show_lost_pin_when_full(pin, pin_num_x, pin_num_y, average_x_pitch, average_y_pitch):
     # try:
     pin_map = np.zeros((int(pin_num_y), int(pin_num_x))).astype(int)
@@ -1666,6 +1686,7 @@ def show_lost_pin_when_full(pin, pin_num_x, pin_num_y, average_x_pitch, average_
 
 ###################################图像增强
 
+# 执行 gamma 校正增强图像对比度。
 def gamma(img, out):
     # img = cv2.imread(source, cv2.IMREAD_GRAYSCALE)
     # 归1
@@ -1678,6 +1699,7 @@ def gamma(img, out):
     cv2.imwrite(out, O, [int(cv2.IMWRITE_PNG_COMPRESSION), 0])
 
 
+# 绘制灰度直方图并根据配置决定是否展示。
 def hist(img, show_img_key):
     # 求出img 的最大最小值
     Maximg = np.max(img)
@@ -1698,6 +1720,7 @@ def hist(img, show_img_key):
     return O
 
 
+# 自动计算直方图阈值进行图像增强。
 def hist_auto(img):
     img = cv2.resize(img, None, fx=0.5, fy=0.5)
     # 创建CLAHE对象
@@ -1712,6 +1735,7 @@ def hist_auto(img):
     cv2.imwrite('hist_auto.png', dst, [int(cv2.IMWRITE_PNG_COMPRESSION), 0])
 
 
+# 手动计算灰度直方图数据。
 def calcGrayHist(I):
     # 计算灰度直方图
     h, w = I.shape[:2]
@@ -1722,6 +1746,7 @@ def calcGrayHist(I):
     return grayHist
 
 
+# 对图像进行直方图均衡化。
 def equalHist(img):
     # import math
     # 灰度图像矩阵的高、宽
@@ -1752,6 +1777,7 @@ def equalHist(img):
     return equalHistImage
 
 
+# 执行线性灰度变换增强图像。
 def linear(img):
     # img = cv2.imread(source, 0)
     # 使用自己写的函数实现
@@ -1761,6 +1787,7 @@ def linear(img):
     cv2.waitKey()
 
 
+# 修正顶部视图的检测框坐标。
 def correct_top_data(data_list_np):
     if len(data_list_np) == 0:
         new_data_list_np = data_list_np
@@ -1802,6 +1829,7 @@ def correct_top_data(data_list_np):
 
 
 ####################################
+# 用顶部数据修正底部和侧面框体。
 def correct_bottom_side_data(top_data_list_np, bottom_data_list_np):
     key = 0
     if len(top_data_list_np) == 0:
@@ -1858,6 +1886,7 @@ def correct_bottom_side_data(top_data_list_np, bottom_data_list_np):
     return new_data_list_np
 
 
+# 比较顶底视图的矩形框并做筛选。
 def compare_top_bottom(top_data_list_np, bottom_data_list_np):
     new_top = np.zeros((0, 4))
     for i in range(len(top_data_list_np)):
@@ -1882,6 +1911,7 @@ def compare_top_bottom(top_data_list_np, bottom_data_list_np):
         return False
 
 
+# 对比顶底标尺框匹配度并进行过滤。
 def compare_top_pairs_data_bottom_pairs_data(top_data_list_np, bottom_data_list_np):
     new_top = np.zeros((0, len(top_data_list_np[0])))
     for i in range(len(top_data_list_np)):
@@ -1906,6 +1936,7 @@ def compare_top_pairs_data_bottom_pairs_data(top_data_list_np, bottom_data_list_
         return False
 
 
+# 将 bottom 侧的行列 OCR 结果进行筛选。
 def filt_hanglie(bottom_data_np):
     # 1.yolox检测pinmap的坐标
     # from output_pinmap_location import begain_output_pinmap_location
@@ -1992,10 +2023,10 @@ def filt_hanglie(bottom_data_np):
     return output_bottom_data_np
 
 
+# 计算顶部 OCR 文本的最大、中值与最小尺寸。
 def cal_max_medium_min_top(ocr_data):
-    '''
-    根据key_info计算出max-medium_min
-    '''
+    # 根据key_info计算出max-medium_min
+    #
 
     # 排查是否存在'Φ'
     for i in range(len(ocr_data)):
@@ -2086,10 +2117,10 @@ def cal_max_medium_min_top(ocr_data):
     return ocr_data
 
 
+# 计算底部 OCR 文本的最大、中值与最小尺寸。
 def cal_max_medium_min_bottom(ocr_data):
-    '''
-    根据key_info计算出max-medium_min
-    '''
+    # 根据key_info计算出max-medium_min
+    #
 
     # 排查是否存在'Φ'
     # for i in range(len(ocr_data)):
@@ -2183,10 +2214,10 @@ def cal_max_medium_min_bottom(ocr_data):
     return ocr_data
 
 
+# 计算侧面 OCR 文本的最大、中值与最小尺寸。
 def cal_max_medium_min_side(ocr_data):
-    '''
-    根据key_info计算出max-medium_min
-    '''
+    # 根据key_info计算出max-medium_min
+    #
     # 排查是否存在唯一'max'
 
     for i in range(len(ocr_data)):
@@ -2288,11 +2319,11 @@ def cal_max_medium_min_side(ocr_data):
     return ocr_data
 
 
+# 将 YOLO 数字框与 OCR 文本绑定。
 def bind_data(yolox_num, ocr_data):
-    '''
-    按照特殊yolox的框线将一个或者多个dbnet的框线合并，并把标注合并
-    'key_info': [['3.505'], ['3.445']]
-    '''
+    # 按照特殊yolox的框线将一个或者多个dbnet的框线合并，并把标注合并
+    # 'key_info': [['3.505'], ['3.445']]
+    #
     new_ocr_data = []
     remember_no_arr = np.zeros(len(ocr_data))  # 记录dbnet的ocr是否被合并
     remember_no_arr_yolox = np.zeros(len(yolox_num))  # 记录yolox的框线是否用于合并
@@ -2346,6 +2377,7 @@ def bind_data(yolox_num, ocr_data):
     return new_ocr_data
 
 
+# 针对 QFP/QFN 流程调度 OCR 推理并整理结果。
 def ocr_get_data_QFP(image_path,
                      yolox_pairs):  # 输入yolox输出的pairs坐标和匹配的data坐标以及图片地址，ocr识别文本后输出data内容按序保存在data_list_np（numpy二维数组）
     show_img_key = 0  # 是否显示过程中ocr待检测图片 0 = 不显示，1 = 显示
@@ -2612,6 +2644,7 @@ def ocr_get_data_QFP(image_path,
     return data_list_np
 
 
+# 调用 ONNX OCR 模型识别并返回结构化数据。
 def ocr_get_data_onnx(image_path,
                       yolox_pairs):  # 输入yolox输出的pairs坐标和匹配的data坐标以及图片地址，ocr识别文本后输出data内容按序保存在data_list_np（numpy二维数组）
     ocr_data = []  # 按序存储pairs的data
@@ -2629,6 +2662,7 @@ def ocr_get_data_onnx(image_path,
     return ocr_data
 
 
+# 判断文本区域是表格还是数字并分别处理。
 def ocr_onnx_table_or_number(img_path, dbnet_data):
     dbnet_data = ocr_en_cn_onnx(img_path, dbnet_data)
     # dbnet_data np.(,5)['x1','y1','x2','y2','0.12']
@@ -2655,12 +2689,14 @@ def ocr_onnx_table_or_number(img_path, dbnet_data):
     return key, new_dbnet_data
 
 
+# 统一调度 OCR 推理并合并多模型输出。
 def ocr_data(img_path, dbnet_data):
     # ocr_get_data(img_path,top_yolox_num)
     dbnet_data = ocr_get_data_onnx(img_path, dbnet_data)
     return dbnet_data
 
 
+# 清理 OCR 结果中误识别的零值或噪声。
 def delete_ocr_zeros(data):
     new_data = np.zeros((0, data.shape[1]))
     for i in range(len(data)):
@@ -2669,6 +2705,7 @@ def delete_ocr_zeros(data):
     return new_data
 
 
+# 获取 YOLO 标尺对与对应检测数据。
 def yolox_get_pairs_and_data(img_path):
     yolox_pairs, yolox_num, other = begain_output_QFP_pairs_data_location(img_path)
     # yolox_pairs np.二维数组[x1,y1,x2,y2,0 = outside 1 = inside]
@@ -2676,6 +2713,7 @@ def yolox_get_pairs_and_data(img_path):
     return yolox_pairs, yolox_num, other
 
 
+# 读取图像基本属性信息。
 def get_img_info(img_path):
     # import cv2
     image = cv2.imread(img_path)
@@ -2685,6 +2723,7 @@ def get_img_info(img_path):
     return w, h
 
 
+# 调用 DBNet 模型获取文本框位置。
 def dbnet_get_data(img_path):
     # import sys
     # sys.path.append("..")
@@ -2700,6 +2739,7 @@ def dbnet_get_data(img_path):
     return dbnet_data
 
 
+# 针对 DB 版本模型读取文本框位置。
 def dbnet_get_data_db(img_path):
     # from system_test import Dbnet_Inference
     location_cool = Dbnet_Inference(img_path)
@@ -2713,11 +2753,13 @@ def dbnet_get_data_db(img_path):
     return dbnet_data
 
 
+# 获取 DBNet 输出的数字类文本框。
 def dbnet_get_num(img_path):
     dbnet_data = dbnet_get_data(img_path)
     return dbnet_data
 
 
+# 整合 YOLO 与 OCR 结果为 pairs 数据结构。
 def get_pairs_data(img_path):
     # import time
     yolox_pairs, yolox_num, other = yolox_get_pairs_and_data(img_path)
@@ -2731,10 +2773,10 @@ def get_pairs_data(img_path):
     return yolox_pairs, yolox_num, other, dbnet_time
 
 
+# 以表格形式可视化检测数据。
 def show_data_table(img_path, data):
-    '''
-    data:np(,5)[x1,y1,x2,y2]
-    '''
+    # data:np(,5)[x1,y1,x2,y2]
+    #
     wh_key1 = True
     while wh_key1:
         auto_key = input("是否展示dbnet框选的标注:y/n:")
@@ -2772,6 +2814,7 @@ def show_data_table(img_path, data):
         cv2.destroyAllWindows()
 
 
+# 在图像上展示检测框和相关信息。
 def show_data(img_path, data):
     wh_key1 = True
     while wh_key1:
@@ -2810,6 +2853,7 @@ def show_data(img_path, data):
         cv2.destroyAllWindows()
 
 
+# 在图像上绘制 OCR 识别的文本结果。
 def show_ocr_result(img_path, ocr):
     # import numpy as np
     # import cv2 as cv
@@ -2889,10 +2933,10 @@ def show_ocr_result(img_path, ocr):
     return ocr
 
 
+# 生成表格视图展示 OCR 结果。
 def show_ocr_result_table(img_path, data):
-    '''
-    data:np(,5)['x1','y1','x2','y2','A1']
-    '''
+    # data:np(,5)['x1','y1','x2','y2','A1']
+    #
     data_a = (data[:, 0:4]).astype(float)
     data_b = data
     data = data_a
@@ -2975,6 +3019,7 @@ def show_ocr_result_table(img_path, data):
     return data_b
 
 
+# 匹配表格类的标尺对与 OCR 文本。
 def match_pairs_data_table(pairs,
                            data):  # pairs[[0,1,2,3],[0,1,2,3]];data[['0','1','2','3','A1'],['0','1','2','3','B1']]
     #
@@ -3296,10 +3341,10 @@ def match_pairs_data_table(pairs,
     return matched_pairs_data
 
 
+# 将 OCR 数据转换为表格字典结构的第一步。
 def io_1(ocr_data):
-    '''
     # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
-    '''
+    #
     result = np.zeros((0, 11))
     for i in range(len(ocr_data)):
         mid = np.zeros((11))
@@ -3316,10 +3361,10 @@ def io_1(ocr_data):
     return result
 
 
+# 在表格字典上继续整理层级的第二步。
 def io_2(ocr_data):
-    '''
-    转换ocr_data为[['0','1','2','3','A1'],['0','1','2','3','B1']]格式
-    '''
+    # 转换ocr_data为[['0','1','2','3','A1'],['0','1','2','3','B1']]格式
+    #
     dbnet_data = np.zeros((0, 5))
     for i in range(len(ocr_data)):
         str1 = np.empty(5, dtype=np.dtype('U10'))
@@ -3330,11 +3375,11 @@ def io_2(ocr_data):
     return dbnet_data
 
 
+# 完成表格字典最终结构调整的第三步。
 def io_3(table_dic):
-    '''
-    删除'data'中的空格
+    # 删除'data'中的空格
     table_dic中的max_medium_min从字符串列表转为数组
-    '''
+    #
     for i in range(len(table_dic)):
         str_data = re.sub(" ", '', table_dic[i]['data'])
         table_dic[i]['data'] = str_data
@@ -3380,6 +3425,7 @@ def io_3(table_dic):
     return table_dic
 
 
+# 对表格字典执行第一阶段过滤逻辑。
 def filter_dic_1(table_dic):
     new_table = []
     print(table_dic)
@@ -3501,13 +3547,13 @@ def filter_dic_1(table_dic):
     return new_table
 
 
+# 对表格字典执行第二阶段过滤逻辑。
 def filter_dic_2(table_dic):
-    '''
-    1.遇到','将字符串按此前后分为两份
-    2.删除非数字部分
-    3.删除英寸
+    # 1.遇到','将字符串按此前后分为两份
+    # 2.删除非数字部分
+    # 3.删除英寸
 
-    '''
+    #
     # 1.
     for i in range(len(table_dic)):
         new_m_list = []
@@ -3581,10 +3627,10 @@ def filter_dic_2(table_dic):
     return table_dic
 
 
+# 提取标尺对的坐标及文本信息。
 def get_pairs_info(ocr_data, yolox_pairs_copy):
-    '''
-    0 = outside 1 = inside
-    '''
+    # 0 = outside 1 = inside
+    #
     for i in range(len(yolox_pairs_copy)):
         for j in range(len(ocr_data)):
             if ocr_data[j]['matched_pairs_location'] != []:
@@ -3595,10 +3641,10 @@ def get_pairs_info(ocr_data, yolox_pairs_copy):
     return ocr_data
 
 
+# 提取引线相关的几何和文本信息。
 def get_yinxian_info(ocr_data, yolox_pairs_length):
-    '''
-    top_yolox_pairs_length np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    # top_yolox_pairs_length np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
+    #
     for i in range(len(yolox_pairs_length)):
         for j in range(len(ocr_data)):
             if ocr_data[j]['matched_pairs_location'] != []:
@@ -3607,12 +3653,12 @@ def get_yinxian_info(ocr_data, yolox_pairs_length):
     return ocr_data
 
 
+# 综合标尺、文本和引线信息进行匹配。
 def match_pairs_data(img_path, pairs, ocr):  # pairs[[0,1,2,3],[0,1,2,3]];data[[0,1,2,3,m,m,m],[0,1,2,3,m,m,m]]
-    '''
     ocr= {'location': yolox_num[i], 'ocr_strings': '', 'key_info': [],
                'matched_pairs_location': [], 'matched_pairs_outside_or_inside': [],
                'matched_pairs_yinXian': [], 'Absolutely': [], 'max_medium_min': []}
-    '''
+    #
     print("---开始视图的标注和标尺线的匹配---")
     # 设置最大匹配距离，超过这一距离无法匹配在一起
     w, h = get_img_info(img_path)
@@ -3993,6 +4039,7 @@ def match_pairs_data(img_path, pairs, ocr):  # pairs[[0,1,2,3],[0,1,2,3]];data[[
     return result
 
 
+# 以图像形式展示匹配后的标尺数据。
 def show_matched_pairs_data(img_path, pairs_data):
     wh_key1 = True
     while wh_key1:
@@ -4041,6 +4088,7 @@ def show_matched_pairs_data(img_path, pairs_data):
             cv2.destroyAllWindows()
 
 
+# 生成表格展示匹配后的标尺数据。
 def show_matched_pairs_data_table(img_path, pairs_data):
     pairs_data = (pairs_data[:, 0: 8]).astype(float)
 
@@ -4087,6 +4135,7 @@ def show_matched_pairs_data_table(img_path, pairs_data):
             cv2.destroyAllWindows()
 
 
+# 过滤 BGA 侧视图中过度冗余的 OCR 信息。
 def BGA_side_filter(side_ocr_data):
     # 1.side中有用的尺寸数字应该小于side_max_limate
     new_side_ocr_data = []
@@ -4100,6 +4149,7 @@ def BGA_side_filter(side_ocr_data):
     return new_side_ocr_data
 
 
+# 根据规则过滤 DBNet 的文本框结果。
 def filter_dbnet(dbnet_data):
     x_l = np.zeros((len(dbnet_data)))
     y_l = np.zeros((len(dbnet_data)))
@@ -4113,6 +4163,7 @@ def filter_dbnet(dbnet_data):
     return new_dbnet_data
 
 
+# 针对底部视图的 DBNet 文本框进行二次筛选。
 def filter_bottom_dbnet(dbnet_data):
     pin_map_limation = get_np_array_in_txt('yolox_data/pin_map_limation.txt')
     # a = np.array([[1, 1, 1, 1]])
@@ -4130,12 +4181,12 @@ def filter_bottom_dbnet(dbnet_data):
     return dbnet_data
 
 
+# 通过线段长度估计标尺对的实际尺寸。
 def find_pairs_length(img_path, pairs, test_mode):
-    '''
-    功能：检测标尺线附近成对的引线
-    pairs np.二维数组[x1,y1,x2,y2,0 = outside 1 = inside]
-    img_path str
-    '''
+    # 功能：检测标尺线附近成对的引线
+    # pairs np.二维数组[x1,y1,x2,y2,0 = outside 1 = inside]
+    # img_path str
+    #
     print("***/开始引线和标尺线的匹配/***")
     # 1.根据pinmap所在位置推测出大概十字线坐标
     pin_map_limation = get_np_array_in_txt(f'{YOLOX_DATA}/pin_map_limation.txt')
@@ -4424,15 +4475,15 @@ def find_pairs_length(img_path, pairs, test_mode):
     except:
         print("保存引线+标尺线组合失败")
     print("***/结束引线和标尺线的匹配/***")
-    return pairs_length  # np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
+    # return pairs_length  # np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
 
 
+# 剔除检测结果中 OTHER 类别的干扰项。
 def delete_other(other, guangJiedu, data):
-    '''
-    other:np.(,4)[x1,y1,x2,y2]
-    guangJiedu:np.(,4)[x1,y1,x2,y2]
-    data:np.(,4)[x1,y1,x2,y2]
-    '''
+    # other:np.(,4)[x1,y1,x2,y2]
+    # guangJiedu:np.(,4)[x1,y1,x2,y2]
+    # data:np.(,4)[x1,y1,x2,y2]
+    #
     # 将other和光洁度框线缩小防止误删
     ratio = 0.5
     ratio = ratio * 0.5
@@ -4480,12 +4531,12 @@ def delete_other(other, guangJiedu, data):
     return new_data
 
 
+# 结合序号与字母框定位底部的引脚索引。
 def find_serial_number_letter(serial_numbers, serial_letters, bottom_dbnet_data):
-    '''
-    serial_numbers:np(,4)[x1,y1,x2,y2]
-    serial_letters:np(,4)[x1,y1,x2,y2]
-    bottom_dbnet_data:np(,4)[x1,y1,x2,y2]
-    '''
+    # serial_numbers:np(,4)[x1,y1,x2,y2]
+    # serial_letters:np(,4)[x1,y1,x2,y2]
+    # bottom_dbnet_data:np(,4)[x1,y1,x2,y2]
+    #
     # 将serial提取出唯一值
     if len(serial_numbers) >= 1:
         maxlength = 0
@@ -4566,12 +4617,13 @@ def find_serial_number_letter(serial_numbers, serial_letters, bottom_dbnet_data)
     return serial_numbers_data, serial_letters_data, new_bottom_dbnet_data
 
 
+# 清理底部 OCR 文本，保留有效的序号与尺寸。
 def filter_bottom_ocr_data(bottom_ocr_data, bottom_dbnet_data_serial, serial_numbers, serial_letters,
                            bottom_dbnet_data):
-    '''
-    输出serial_numbers_data:np.(,4)['x1','y1','x2','y2','str']
-    serial_numbers:np(,4)[x1,y1,x2,y2]
-    '''
+    #
+    # 输出serial_numbers_data:np.(,4)['x1','y1','x2','y2','str']
+    # serial_numbers:np(,4)[x1,y1,x2,y2]
+    #
     serial_numbers_data = np.zeros((0, 5))
     serial_letters_data = np.zeros((0, 5))
     bottom_ocr_new_data = []
@@ -4597,12 +4649,12 @@ def filter_bottom_ocr_data(bottom_ocr_data, bottom_dbnet_data_serial, serial_num
     return serial_numbers_data, serial_letters_data, bottom_ocr_new_data
 
 
+# 对表格结构的 OCR 结果进行筛查与纠错。
 def shilter_table_data(ocr_data):
-    '''
     ocr_data = {'location': dbnet_data[i], 'ocr_strings': ocr_data[i], 'key_info': [],
                'matched_pairs_location': [], 'matched_pairs_outside_or_inside': [],
                'matched_pairs_yinXian': [], 'Absolutely': [], 'max_medium_min': []}
-    '''
+    #
     new_dbnet_data = []
     for i in range(len(ocr_data)):
         strings = ocr_data[i]['ocr_strings']
@@ -4611,12 +4663,12 @@ def shilter_table_data(ocr_data):
     return new_dbnet_data
 
 
+# 把 DBNet/OCR 结果整合成字典形式。
 def convert_Dic(dbnet_data, ocr_data):
-    '''
-    将ocr识别出来的字符串与位置信息结合为字典类型
-    dbnet_data:np(, 4)[x1,y1,x2,y2]
+    # 将ocr识别出来的字符串与位置信息结合为字典类型
+    # dbnet_data:np(,
     ocr_data:list['string','str']
-    '''
+    #
     new_ocr_data = []
     for i in range(len(dbnet_data)):
         dic = {'location': dbnet_data[i], 'ocr_strings': ocr_data[i], 'key_info': [],
@@ -4626,10 +4678,10 @@ def convert_Dic(dbnet_data, ocr_data):
     return new_ocr_data
 
 
+# 应用规则 0 对 OCR 数据进行过滤。
 def filter_ocr_data_0(ocr_data):
-    '''
-    筛除‘’
-    '''
+    # 筛除‘’
+    #
     new_ocr_data = []
     for i in range(len(ocr_data)):
         if not (ocr_data[i]['ocr_strings'] == ''):
@@ -4637,10 +4689,10 @@ def filter_ocr_data_0(ocr_data):
     return new_ocr_data
 
 
+# 应用规则 -1 对 OCR 数据进行过滤。
 def filter_ocr_data__1(ocr_data):
-    '''
-    删除标注关键信息检测识别为空
-    '''
+    # 删除标注关键信息检测识别为空
+    #
     new_ocr_data = []
     for i in range(len(ocr_data)):
         if not (ocr_data[i]['key_info'] == []):
@@ -4648,10 +4700,10 @@ def filter_ocr_data__1(ocr_data):
     return new_ocr_data
 
 
+# 应用规则 -2 对 OCR 数据进行过滤。
 def filter_ocr_data__2(ocr_data):
-    '''
-    清理key_info中不含数字的数据
-    '''
+    # 清理key_info中不含数字的数据
+    #
     new_ocr_data = []
     for i in range(len(ocr_data)):
         right_key = 0
@@ -4672,10 +4724,10 @@ def filter_ocr_data__2(ocr_data):
     return ocr_data
 
 
+# 应用规则 1 对 OCR 数据进行过滤。
 def filter_ocr_data_1(list):
-    '''
-    字符串中删除‘数字‘ + 'X’ (字符串中不存在'='时),'Absolutely'为'mb_pin_diameter'
-    '''
+    # 字符串中删除‘数字‘ + 'X’ (字符串中不存在'='时),'Absolutely'为'mb_pin_diameter'
+    #
     for i in range(len(list)):
         str_data1 = re.findall("=", list[i]['ocr_strings'])
         if len(str_data1) == 0:
@@ -4687,50 +4739,50 @@ def filter_ocr_data_1(list):
     return list
 
 
+# 应用规则 2 对 OCR 数据进行过滤。
 def filter_ocr_data_2(list):
-    '''
-    字符串中删除'PIN1'和’PIN‘
-    '''
+    # 字符串中删除'PIN1'和’PIN‘
+    #
     for i in range(len(list)):
         str_data = re.sub("[Pp][Ii][Nn]1*", '', list[i]['ocr_strings'])
         list[i]['ocr_strings'] = str_data
     return list
 
 
+# 应用规则 3 对 OCR 数据进行过滤。
 def filter_ocr_data_3(list):
-    '''
-    字符串中删除'A1'
-    '''
+    # 字符串中删除'A1'
+    #
     for i in range(len(list)):
         str_data = re.sub("[Aa]1", '', list[i]['ocr_strings'])
         list[i]['ocr_strings'] = str_data
     return list
 
 
+# 应用规则 11 对 OCR 数据进行过滤。
 def filter_ocr_data_11(list):
-    '''
-    删除'note' + '整数数字'
-    '''
+    # 删除'note' + '整数数字'
+    #
     for i in range(len(list)):
         str_data = re.sub("[Nn][Oo][Tt][Ee][23456789]", '', list[i]['ocr_strings'])
         list[i]['ocr_strings'] = str_data
     return list
 
 
+# 应用规则 4 对 OCR 数据进行过滤。
 def filter_ocr_data_4(list):
-    '''
-    ’,‘改为’.‘
-    '''
+    # ’,‘改为’.‘
+    #
     for i in range(len(list)):
         str_data = re.sub("[,，]", '.', list[i]['ocr_strings'])
         list[i]['ocr_strings'] = str_data
     return list
 
 
+# 应用规则 5 对 OCR 数据进行过滤。
 def filter_ocr_data_5(list):
-    '''
-    单个字符时，字符串中删除'A''B''C''D'
-    '''
+    # 单个字符时，字符串中删除'A''B''C''D'
+    #
     for i in range(len(list)):
         if len(list[i]['ocr_strings']) == 1:
             str_data = re.sub("[AaBbCcDd]", '', list[i]['ocr_strings'])
@@ -4738,11 +4790,11 @@ def filter_ocr_data_5(list):
     return list
 
 
+# 应用规则 6 对 OCR 数据进行过滤。
 def filter_ocr_data_6(list):
-    '''
-    提取’数字‘’+‘’-‘’=‘’Φ‘’±‘’max‘’nom‘’min‘'x'
-    如果检测到"±",仅保留"±"以及符号的前一位数字和后一位数字
-    '''
+    # 提取’数字‘’+‘’-‘’=‘’Φ‘’±‘’max‘’nom‘’min‘'x'
+    # 如果检测到"±",仅保留"±"以及符号的前一位数字和后一位数字
+    #
     for i in range(len(list)):
         str_data = re.findall("\d+(?:\.\d+)?|=|\+|-|Φ|±|[Mm][Aa][Xx]|[Nn][Oo][Mm]|[Mm][Ii][Nn]|[Xx*]",
                               list[i]['ocr_strings'])
@@ -4769,11 +4821,11 @@ def filter_ocr_data_6(list):
     return list
 
 
+# 应用规则 7 对 OCR 数据进行过滤。
 def filter_ocr_data_7(list):
-    '''
-    删除key_info中的'.'
-    当key_info中只有'x'时删除
-    '''
+    # 删除key_info中的'.'
+    # 当key_info中只有'x'时删除
+    #
     for i in range(len(list)):
         new_key_info = []
         for k in range(len(list[i]['key_info'])):
@@ -4787,10 +4839,10 @@ def filter_ocr_data_7(list):
     return list
 
 
+# 应用规则 8 对 OCR 数据进行过滤。
 def filter_ocr_data_8(list):
-    '''
-    找‘Φ’，并删除'Φ'然后标识'absolute'
-    '''
+    # 找‘Φ’，并删除'Φ'然后标识'absolute'
+    #
     for i in range(len(list)):
         str_data = re.findall("Φ", list[i]['ocr_strings'])
         str_data = [x.strip() for x in str_data if x.strip() != '']  # 将字符串列表中空项删除
@@ -4801,10 +4853,10 @@ def filter_ocr_data_8(list):
     return list
 
 
+# 应用规则 9 对 OCR 数据进行过滤。
 def filter_ocr_data_9(ocr_data):
-    '''
-    key_info中的数字如果以'0'开头而第二个字符却没有小数点，则添加小数点
-    '''
+    # key_info中的数字如果以'0'开头而第二个字符却没有小数点，则添加小数点
+    #
     for i in range(len(ocr_data)):
         for j in range(len(ocr_data[i]['key_info'])):
             for k in range(len(ocr_data[i]['key_info'][j])):
@@ -4822,10 +4874,10 @@ def filter_ocr_data_9(ocr_data):
     return ocr_data
 
 
+# 应用规则 10 对 OCR 数据进行过滤。
 def filter_ocr_data_10(ocr_data):
-    '''
     # 删除key_info中的'0','0.','00'
-    '''
+    #
 
     for i in range(len(ocr_data)):
         new_key_info = []
@@ -4837,10 +4889,10 @@ def filter_ocr_data_10(ocr_data):
     return ocr_data
 
 
+# 应用规则 12 对 OCR 数据进行过滤。
 def filter_ocr_data_12(ocr_data):
-    '''
-    删除公差特别大的标注
-    '''
+    # 删除公差特别大的标注
+    #
     new_ocr_data = []
     for i in range(len(ocr_data)):
         if abs(ocr_data[i]['max_medium_min'][0] - ocr_data[i]['max_medium_min'][1]) < 1 and abs(
@@ -4850,6 +4902,7 @@ def filter_ocr_data_12(ocr_data):
             print('删除公差特别大的标注:', ocr_data[i]['max_medium_min'])
     return new_ocr_data
 
+# 异步执行 pinmap 识别并缓存结果。
 def time_save_find_pinmap(bottom_border):
     result_queue = queue.Queue()
     thread = threading.Thread(target=long_running_task, args=(result_queue, bottom_border))
@@ -4893,6 +4946,7 @@ def time_save_find_pinmap(bottom_border):
 
     return pin_map, color
 
+# 在子线程中执行耗时的 pinmap 识别任务。
 def long_running_task(result_queue, bottom_border):
     print()
     print("***/开始检测pin/***")
@@ -4905,6 +4959,7 @@ def long_running_task(result_queue, bottom_border):
     result_queue.put(result)
     print("***/结束检测pin/***")
     print()
+# 串联 YOLO、DBNet 与 OCR，完成匹配流程。
 def yolox_dbnet_ocr_match(test_mode, letter_or_number):
 
     package_classes = 'BGA'
@@ -5324,6 +5379,7 @@ def yolox_dbnet_ocr_match(test_mode, letter_or_number):
         # yolox_pairs_top, yolox_pairs_bottom, yolox_pairs_side, top_yolox_pairs_length, bottom_yolox_pairs_length, side_yolox_pairs_length, serial_numbers_data, serial_letters_data, serial_numbers, serial_letters, letter_or_number, top_ocr_data, bottom_ocr_data, side_ocr_data
 
 
+# 根据候选数据挑选最合适的 pin 直径。
 def find_pin_diameter(pin_diameter, high, top_data_np, bottom_data_np, side_data_np, pitch_x, pitch_y):
     pin_diameter = np.zeros((0, 3))
     pin_diameter_1 = np.zeros((0, 3))  # 存储可能的pin直径值，
@@ -5397,6 +5453,7 @@ def find_pin_diameter(pin_diameter, high, top_data_np, bottom_data_np, side_data
     return pin_diameter
 
 
+# 清空指定文件夹内容。
 def empty_folder(folder_path):
     try:
         shutil.rmtree(folder_path)
@@ -5538,11 +5595,11 @@ def empty_folder(folder_path):
 #     return body_x, body_y
 
 
+# 在引线识别结果中寻找行列间距。
 def yinXinan_find_pitch(yolox_pairs_bottom, bottom_yolox_pairs_length, pin):
-    '''
     # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
     # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找pitch---")
     pitch_max = 2.5  # 限定最大pitch值
     # 补充：将匹配得到的标注添加到引线中
@@ -5700,11 +5757,11 @@ def yinXinan_find_pitch(yolox_pairs_bottom, bottom_yolox_pairs_length, pin):
     return pitch_x, pitch_y
 
 
+# 在表格模式下计算行列间距。
 def yinXinan_find_pitch_table(yolox_pairs_bottom, bottom_yolox_pairs_length):
-    '''
     # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
     # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找pitch---")
     pitch_max = 2.5
     pitch_str = np.empty(len(bottom_yolox_pairs_length), dtype=np.dtype('U10'))
@@ -5809,11 +5866,11 @@ def yinXinan_find_pitch_table(yolox_pairs_bottom, bottom_yolox_pairs_length):
     return pitch_x, pitch_y
 
 
+# 根据引线信息估算 pin 直径。
 def yinXinan_find_pin_diameter(yolox_pairs_bottom, bottom_yolox_pairs_length, pin):
-    '''
         # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
         # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找pin_diameter---")
     # 补充：将匹配得到的标注添加到引线中
     new_bottom_yolox_pairs_length = np.zeros((len(bottom_yolox_pairs_length), 16))
@@ -5885,11 +5942,11 @@ def yinXinan_find_pin_diameter(yolox_pairs_bottom, bottom_yolox_pairs_length, pi
     return pin_diameter
 
 
+# 在表格模式下估算 pin 直径。
 def yinXinan_find_pin_diameter_table(yolox_pairs_bottom, bottom_yolox_pairs_length):
-    '''
         # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
         # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找pin_diameter---")
     bottom_str = np.empty(len(bottom_yolox_pairs_length), dtype=np.dtype('U10'))
     # top_str， bottom_str记录每个找到引线的标尺线匹配的标注字符串
@@ -5955,11 +6012,11 @@ def yinXinan_find_pin_diameter_table(yolox_pairs_bottom, bottom_yolox_pairs_leng
     return pin_diameter
 
 
+# 从上下视图测得封装长宽。
 def yinXinan_find_body(yolox_pairs_top, top_yolox_pairs_length, yolox_pairs_bottom, bottom_yolox_pairs_length, top_border, bottom_border):
-    '''
     # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
     # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
 
     print("---开始用引线方法寻找body---")
     # print("top_yolox_pairs_length, bottom_yolox_pairs_length\n", top_yolox_pairs_length, bottom_yolox_pairs_length)
@@ -6147,11 +6204,11 @@ def yinXinan_find_body(yolox_pairs_top, top_yolox_pairs_length, yolox_pairs_bott
     return body_x, body_y
 
 
+# 在表格模式下估算封装长宽。
 def yinXinan_find_body_table(yolox_pairs_top, top_yolox_pairs_length, yolox_pairs_bottom, bottom_yolox_pairs_length):
-    '''
     # yolox_pairs_top,np.二维数组（，9）[pairs_'x1'_'y1'_'x2'_'y2',标注'x1'_'y1'_'x2'_'y2'，'A1']
     # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找body---")
     top_str = np.empty(len(top_yolox_pairs_length), dtype=np.dtype('U10'))
     bottom_str = np.empty(len(bottom_yolox_pairs_length), dtype=np.dtype('U10'))
@@ -6360,11 +6417,11 @@ def yinXinan_find_body_table(yolox_pairs_top, top_yolox_pairs_length, yolox_pair
     return body_x, body_y
 
 
+# 根据侧视标尺寻找高度与 standoff。
 def yinXian_find_side_high_standoff(yolox_pairs_side, side_yolox_pairs_length):
-    '''
     # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
     # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找high和standoff---")
     high = np.zeros((3))
     standoff = np.zeros((3))
@@ -6474,11 +6531,11 @@ def yinXian_find_side_high_standoff(yolox_pairs_side, side_yolox_pairs_length):
     return high, standoff
 
 
+# 在表格模式下寻找高度与 standoff。
 def yinXian_find_side_high_standoff_table(yolox_pairs_side, side_yolox_pairs_length):
-    '''
     # yolox_pairs_top,np.二维数组（，11）[pairs_x1_y1_x2_y2,标注x1_y1_x2_y2，max,medium,min]
     # top_yolox_pairs_length,np.二维数组（，13）[pairs_x1_y1_x2_y2,引线1_x1_y1_x2_y2,引线2_x1_y1_x2_y2,两引线距离]
-    '''
+    #
     print("---开始用引线方法寻找high和standoff---")
     high = ''
     standoff = ''
@@ -6591,10 +6648,10 @@ def yinXian_find_side_high_standoff_table(yolox_pairs_side, side_yolox_pairs_len
     return high, standoff
 
 
+# 调用 OCR 模型识别中英文混合文本。
 def ocr_en_cn(img_path, location):
-    '''
-    location:np.(,4)[x1,y1,x2,y2]
-    '''
+    # location:np.(,4)[x1,y1,x2,y2]
+    #
     show_img_key = 0  # 是否显示过程中ocr待检测图片 0 = 不显示，1 = 显示
     data = np.array([[0, 0, 0, 0, '0']])
     # 加载ocr模型
@@ -6756,10 +6813,10 @@ def ocr_en_cn(img_path, location):
     return data
 
 
+# 使用 ONNX OCR 模型识别中英文文本。
 def ocr_en_cn_onnx(img_path, location):
-    '''
-    location:np.(,4)[x1,y1,x2,y2]
-    '''
+    # location:np.(,4)[x1,y1,x2,y2]
+    #
 
     # from ocr_onnx.onnx_use import Run_onnx
     show_img_key = 0  # 是否显示过程中ocr待检测图片 0 = 不显示，1 = 显示
@@ -6928,6 +6985,7 @@ def ocr_en_cn_onnx(img_path, location):
     return data
 
 
+# 整理序号字母的识别结果。
 def correct_serial_letters_data(serial_letters_data):
     for i in range(len(serial_letters_data)):
         j = -1
@@ -6941,13 +6999,13 @@ def correct_serial_letters_data(serial_letters_data):
     return serial_letters_data
 
 
+# 综合序号信息确定行列数及 Pin1 位置。
 def find_pin_num_pin_1(serial_numbers_data, serial_letters_data, serial_numbers, serial_letters):
-    '''
-    serial_numbers_data:np.(,4)['x1','y1','x2','y2','str']
-    serial_letters_data:np.(,4)['x1','y1','x2','y2','str']
-    serial_numbers:np.(,4)[x1,y1,x2,y2)
-    serial_letters:np.(,4)[x1,y1,x2,y2)
-    '''
+    # serial_numbers_data:np.(,4)['x1','y1','x2','y2','str']
+    # serial_letters_data:np.(,4)['x1','y1','x2','y2','str']
+    # serial_numbers:np.(,4)[x1,y1,x2,y2)
+    # serial_letters:np.(,4)[x1,y1,x2,y2)
+    #
     # 默认输出
     pin_num_x_serial = 0
     pin_num_y_serial = 0
@@ -7116,11 +7174,11 @@ def find_pin_num_pin_1(serial_numbers_data, serial_letters_data, serial_numbers,
     return pin_num_x_serial, pin_num_y_serial, pin_1_location
 
 
+# 从 OCR 文本中解析绝对高度。
 def get_absolute_high(high, side_ocr_data):
-    '''
-    当只找到一个max则判断绝对是high
-    当找到多个max哪个最大哪个就是high
-    '''
+    # 当只找到一个max则判断绝对是high
+    # 当找到多个max哪个最大哪个就是high
+    #
     high_max = np.zeros((0, 3))
     for i in range(len(side_ocr_data)):
         if side_ocr_data[i]['Absolutely'] == 'high':
@@ -7135,10 +7193,10 @@ def get_absolute_high(high, side_ocr_data):
     return high
 
 
+# 从 OCR 文本中解析绝对的引脚数量。
 def get_absolute_pin_num(pin_x_num, pin_y_num, bottom_ocr_data):
-    '''
 
-    '''
+    #
     for i in range(len(bottom_ocr_data)):
         if bottom_ocr_data[i]['Absolutely'] == 'pin_num_x':
             try:
@@ -7155,10 +7213,10 @@ def get_absolute_pin_num(pin_x_num, pin_y_num, bottom_ocr_data):
     return pin_x_num, pin_y_num
 
 
+# 从 OCR 文本中解析绝对的间距。
 def get_absolute_pitch(pitch_x, pitch_y, bottom_ocr_data):
-    '''
 
-    '''
+    #
     for i in range(len(bottom_ocr_data)):
         if bottom_ocr_data[i]['Absolutely'] == 'pitch_x':
             try:
@@ -7175,6 +7233,7 @@ def get_absolute_pitch(pitch_x, pitch_y, bottom_ocr_data):
     return pitch_x, pitch_y
 
 
+# 从 OCR 文本中解析绝对的 pin 直径。
 def get_absolute_pin_diameter(pin_diameter, top_ocr_data, bottom_ocr_data, side_ocr_data):
     mb_pin_diameter = np.zeros((0, 3))  # 记录所有可能的pin直径
     mb_ratio = []  # 记录每个pin直径的置信度
@@ -7202,9 +7261,9 @@ def get_absolute_pin_diameter(pin_diameter, top_ocr_data, bottom_ocr_data, side_
             mb_pin_diameter = np.r_[mb_pin_diameter, [top_ocr_data[i]['max_medium_min']]]
             mb_ratio.append(2)
     print("可能的pin直径:\n", mb_pin_diameter)
-    '''
-    将全为0的pin直径置信度为0，将三值不等的pin直径置信度加1
-    '''
+    #
+    # 将全为0的pin直径置信度为0，将三值不等的pin直径置信度加1
+    #
     for i in range(len(mb_ratio)):
         if mb_pin_diameter[i][0] == mb_pin_diameter[i][1] == mb_pin_diameter[i][2] == 0:
             mb_ratio[i] = 0
@@ -7223,6 +7282,7 @@ def get_absolute_pin_diameter(pin_diameter, top_ocr_data, bottom_ocr_data, side_
     return pin_diameter
 
 
+# 在表格信息中获取 pin 直径。
 def get_pin_diameter_table_absolute(top_ocr_data, bottom_ocr_data, side_ocr_data):
     pin_diameter = ''
     if pin_diameter == '':
@@ -7243,6 +7303,7 @@ def get_pin_diameter_table_absolute(top_ocr_data, bottom_ocr_data, side_ocr_data
     return pin_diameter
 
 
+# 输出 BGA 参数表格结果。
 def output_table_BGA(body_x_yinXian, body_y_yinXian, pitch_x_yinXian, pitch_y_yinXian, high_yinXian,
                      pin_diameter_yinXian, standoff_yinXian, pin_num_x_serial, pin_num_y_serial, pin_1_location,
                      table_dic):
@@ -7321,6 +7382,7 @@ def output_table_BGA(body_x_yinXian, body_y_yinXian, pitch_x_yinXian, pitch_y_yi
     return body_x, body_y, pitch_x, pitch_y, high, pin_diameter, standoff, pin_num_x, pin_num_y, pin_1_location
 
 
+# 处理表格字典的第一阶段整理。
 def process_dic_1(table_dic, pin_num_x_serial, pin_num_y_serial):
     if table_dic[5] == ['', '', '', '']:
         if pin_num_y_serial == 0:
@@ -7345,6 +7407,7 @@ def process_dic_1(table_dic, pin_num_x_serial, pin_num_y_serial):
     return table_dic
 
 
+# 处理表格字典的第二阶段整理。
 def process_dic_2(table_dic):
     ze = ['', '', '', '']
     key = 0  # 0代表经验判断长宽不等，1代表经验判断长宽相等
@@ -7391,6 +7454,7 @@ def process_dic_2(table_dic):
     return table_dic
 
 
+# 处理表格字典的第三阶段整理。
 def process_dic_3(table_dic):
     ze = ['', '', '', '']
     ze1 = ['', 0, 0, 0]
@@ -7406,6 +7470,7 @@ def process_dic_3(table_dic):
     return table_dic
 
 
+# 处理表格字典的第四阶段整理。
 def process_dic_4(table_dic):
     ze = ['', 0, 0, 0]
     if table_dic[0] != ze:
@@ -7451,10 +7516,10 @@ def process_dic_4(table_dic):
         pin_num_x_serial, pin_num_y_serial
 
 
+# 在多轮计算后给出最终 pin 直径。
 def find_pin_diameter_last(pin_diameter, side_data_np, high):
-    '''
 
-    '''
+    #
     likely_pin_diameter = np.zeros((0, 3))
     side_1 = 0
     side_2 = 0
@@ -7502,6 +7567,7 @@ def find_pin_diameter_last(pin_diameter, side_data_np, high):
         return pin_diameter
 
 
+# 封装整个流程的入口，执行匹配与展示。
 def yinXian_begain_get_data_present(test_mode, letter_or_number, table_dic):
     # empty_folder(r'opencv_output')
     # os.makedirs(r'opencv_output')
@@ -7536,9 +7602,9 @@ def yinXian_begain_get_data_present(test_mode, letter_or_number, table_dic):
         body_x_yinXian, body_y_yinXian = yinXinan_find_body(yolox_pairs_top, top_yolox_pairs_length, yolox_pairs_bottom,
                                                             bottom_yolox_pairs_length, top_border, bottom_border)
         print('body_x_yinXian,body_y_yinXian', body_x_yinXian, body_y_yinXian)
-        '''
-        onnx未集成PIN球，无法使用函数
-        '''
+        #
+        # onnx未集成PIN球，无法使用函数
+        #
         # bottom根据引线找pitch
         pitch_x_yinXian, pitch_y_yinXian = yinXinan_find_pitch(yolox_pairs_bottom, bottom_yolox_pairs_length, bottom_pin)
         print('pitch_x_yinXian, pitch_y_yinXian', pitch_x_yinXian, pitch_y_yinXian)
@@ -7548,9 +7614,9 @@ def yinXian_begain_get_data_present(test_mode, letter_or_number, table_dic):
         # pitch_x_yinXian = []
         # pitch_y_yinXian = []
         # pin_diameter_yinXian = []
-        '''
+        #
         onnx未集成BGAside
-        '''
+        #
         # # side视图根据引线找high和standoff
         # high_yinXian, standoff_yinXian = yinXian_find_side_high_standoff(yolox_pairs_side, side_yolox_pairs_length)
         # print('high_yinXian, standoff_yinXian', high_yinXian, standoff_yinXian)
@@ -7601,19 +7667,19 @@ def yinXian_begain_get_data_present(test_mode, letter_or_number, table_dic):
         # pin_diameter_yinXian = ''
         # standoff_yinXian = ''
 
-        '''
+        #
         table_dic = list(10, 4)
-        [['', 10, 10, 10], 实体长
-        ['', 10, 10, 10], 实体宽
-        ['', 10, 10, 10], 实体高
-        ['', 10, 10, 10], 支撑高
-        ['', 10, 10, 10], 球直径
-        ['', 10, 10, 10], 行数
-        ['', 10, 10, 10], 列数
-        ['', 10, 10, 10], 行pitch
-        ['', 10, 10, 10], 列pitch
-        ['', '', '', '']] 缺pin
-        '''
+        # ['', 10, 10, 10], 实体长
+        # ['', 10, 10, 10], 实体宽
+        # ['', 10, 10, 10], 实体高
+        # ['', 10, 10, 10], 支撑高
+        # ['', 10, 10, 10], 球直径
+        # ['', 10, 10, 10], 行数
+        # ['', 10, 10, 10], 列数
+        # ['', 10, 10, 10], 行pitch
+        # ['', 10, 10, 10], 列pitch
+        # ['', '', '', '']] 缺pin
+        #
         print("table_dic", table_dic)
         # 填充行数,列数
         # table_dic = process_dic_1(table_dic, pin_num_x_serial, pin_num_y_serial)
@@ -7641,6 +7707,7 @@ def yinXian_begain_get_data_present(test_mode, letter_or_number, table_dic):
         return body_x_yinXian, body_y_yinXian, pitch_x_yinXian, pitch_y_yinXian, high_yinXian, pin_diameter_yinXian, standoff_yinXian, pin_num_x_serial, pin_num_y_serial, pin_1_location, yolox_pairs_top_copy, yolox_pairs_bottom_copy, yolox_pairs_side_copy, letter_or_number, top_ocr_data, bottom_ocr_data, side_ocr_data, pin_map
 
 
+# 在数据齐备情况下汇总 BGA 参数。
 def begain_get_pairs_data_present2(body_x_yinXian, body_y_yinXian, pitch_x_yinXian, pitch_y_yinXian, high_yinXian,
                                    pin_diameter_yinXian, standoff_yinXian, pin_num_x_serial, pin_num_y_serial,
                                    yolox_pairs_top_copy, yolox_pairs_bottom_copy, yolox_pairs_side_copy, pin_1_location,
@@ -7847,9 +7914,9 @@ def begain_get_pairs_data_present2(body_x_yinXian, body_y_yinXian, pitch_x_yinXi
                                              pitch_y)
             print("3.找到可能是pin直径的数据(max,medium,min)\n", pin_diameter)
         if len(pin_diameter) == 0:
-            '''
+            #
             side视图中寻找少数方向种类中满足大概范围的标注作为pin直径       
-            '''
+            #
             pin_diameter = find_pin_diameter_last(pin_diameter, side_data_np, high)
 
         pin_map_present = show_lost_pin_when_full(pin, pin_x_num, pin_y_num, average_pitch_x, average_pitch_y)
@@ -8018,9 +8085,9 @@ def begain_get_pairs_data_present2(body_x_yinXian, body_y_yinXian, pitch_x_yinXi
             print("3.找到可能是pin直径的数据(max,medium,min)\n", pin_diameter)
         pin_map_present = show_lost_pin_when_full(pin, pin_x_num, pin_y_num, average_pitch_x, average_pitch_y)
         if len(pin_diameter) == 0:
-            '''
+            #
             side视图中寻找少数方向种类中满足大概范围的标注作为pin直径       
-            '''
+            #
             pin_diameter = find_pin_diameter_last(pin_diameter, side_data_np)
         if len(pin_diameter) == 0:
             standoff = np.zeros((0, 3))
@@ -8079,6 +8146,7 @@ def begain_get_pairs_data_present2(body_x_yinXian, body_y_yinXian, pitch_x_yinXi
         return body_x, body_y, pin_x_num, pin_y_num, pitch_x, pitch_y, high, pin_diameter, standoff, pin_map_present
 
 
+# 输出 pinmap 表格展示。
 def get_pinmap_table():
     # 先取行pin数和列pin数
     pin_num_txt = r'yolox_data\pin_num.txt'
@@ -8095,6 +8163,7 @@ def get_pinmap_table():
     return pin_map_present
 
 
+# 以可视化方式展示 top 视图的匹配结果。
 def tf(pairs_data):
     data_np = np.zeros((0, 5))
     data_np_arr = np.zeros(5)
@@ -8111,6 +8180,7 @@ def tf(pairs_data):
     return data_np
 
 
+# 以可视化方式展示 bottom 视图的匹配结果。
 def tfbottom(pairs_data):
     data_np = np.zeros((0, 9))
     data_np_arr = np.zeros(9)
@@ -8127,6 +8197,7 @@ def tfbottom(pairs_data):
         data_np = np.r_[data_np, [data_np_arr]]
     return data_np
 
+# 运行 BGA PIN 提取流程的入口。
 def extract_BGA_PIN():
     print("开始提取BGA的PIN")
     package_classes = 'BGA'
