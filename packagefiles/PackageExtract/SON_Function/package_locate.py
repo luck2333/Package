@@ -4,6 +4,7 @@ import os
 import time
 import re
 import shutil
+from pathlib import Path
 from shapely.geometry import Polygon, Point
 import xml.etree.ElementTree as ET
 import xml.dom.minidom
@@ -12,6 +13,12 @@ import cv2
 import numpy as np
 import fitz
 import onnxruntime
+
+try:
+    from packagefiles.model_paths import yolo_model_path
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    def yolo_model_path(*parts):
+        return str(Path(__file__).resolve().parents[3] / 'model' / 'yolo_model' / Path(*parts))
 
 VOC_CLASSES = ('Border',
                'Pad',
@@ -316,7 +323,7 @@ def make_parser():
         "-m",
         "--model",
         type=str,
-        default=r"model/yolo_model/package_model/DFN_SON_0910.onnx",
+        default=yolo_model_path("package_model", "DFN_SON_0910.onnx"),
         help="Input your onnx model.",
     )                                      # 权重参数选择
     parser.add_argument(
