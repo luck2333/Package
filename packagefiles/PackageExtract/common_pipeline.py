@@ -9,6 +9,7 @@ from typing import Iterable, Tuple
 import numpy as np
 
 from packagefiles.PackageExtract.DETR_BGA import DETR_BGA
+from packagefiles.PackageExtract import get_pairs_data_present5_test as _pairs_module
 from packagefiles.PackageExtract.function_tool import (
     empty_folder,
     find_list,
@@ -19,7 +20,25 @@ from packagefiles.PackageExtract.onnx_use import Run_onnx_det
 from packagefiles.PackageExtract.yolox_onnx_py.onnx_QFP_pairs_data_location2 import (
     begain_output_pairs_data_location,
 )
-from packagefiles.PackageExtract import get_pairs_data_present5_test as _pairs_module
+
+# 目录定位：保持与用户提供的脚本一致，便于在不同 IDE 中运行。
+file_dir = str(os.path.abspath(__file__))
+current_dir = str(os.path.dirname(file_dir))
+parent_dir = str(os.path.dirname(current_dir))
+root_dir = str(os.path.dirname(parent_dir))
+
+current_dir = current_dir.replace("\\", "//")
+parent_dir = parent_dir.replace("\\", "//")
+root_dir = root_dir.replace("\\", "//")
+
+# 全局路径，兼容原脚本中的写法。
+DATA = root_dir + "//" + "Result//Package_extract//data"
+DATA_BOTTOM_CROP = root_dir + "//" + "Result//Package_extract//data_bottom_crop"
+DATA_COPY = root_dir + "//" + "Result//Package_extract//data_copy"
+ONNX_OUTPUT = root_dir + "//" + "Result//Package_extract//onnx_output"
+OPENCV_OUTPUT = root_dir + "//" + "Result//Package_extract//opencv_output"
+OPENCV_OUTPUT_LINE = root_dir + "//" + "Result//Package_extract//opencv_output_yinXian"
+YOLO_DATA = root_dir + "//" + "Result//Package_extract//yolox_data"
 
 
 # 默认需要处理的视图顺序，保持与原流程一致。
@@ -34,22 +53,14 @@ def prepare_workspace(
     opencv_output_dir: str,
     image_views: Iterable[str] = DEFAULT_VIEWS,
 ) -> None:
-    """初始化提取流程所需的临时目录，并统一输入图片尺寸。
+    """初始化提取流程所需的临时目录，并统一输入图片尺寸。"""
 
-    该函数完整复刻了旧版 ``front_loading_work`` 的处理步骤：
-    1. 清空上一次推理的中间产物目录；
-    2. 遍历多个视图，确保图片尺寸符合推理要求；
-    3. 将视图图像备份到 ``data_copy``，再还原到 ``data``，保证后续步骤在干净的副本上运行。
-    """
-
-    # 重置存放检测结果的临时目录。
     empty_folder(onnx_output_dir)
     os.makedirs(onnx_output_dir, exist_ok=True)
 
     empty_folder(data_bottom_crop_dir)
     os.makedirs(data_bottom_crop_dir, exist_ok=True)
 
-    # 逐个视图调整图片尺寸，缺失图片时保留提示信息。
     for view_name in image_views:
         filein = os.path.join(data_dir, f"{view_name}.jpg")
         fileout = filein
@@ -58,18 +69,15 @@ def prepare_workspace(
         except Exception:
             print("文件", filein, "不存在")
 
-    # 备份视图图片，保留当前状态。
     empty_folder(data_copy_dir)
     os.makedirs(data_copy_dir, exist_ok=True)
     if os.path.isdir(data_dir):
         for file_name in os.listdir(data_dir):
             shutil.copy(os.path.join(data_dir, file_name), os.path.join(data_copy_dir, file_name))
 
-    # 清空 OpenCV 的输出目录。
     empty_folder(opencv_output_dir)
     os.makedirs(opencv_output_dir, exist_ok=True)
 
-    # 使用备份重新构建 ``data`` 目录，确保后续步骤在一致的数据上运行。
     empty_folder(data_dir)
     os.makedirs(data_dir, exist_ok=True)
     if os.path.isdir(data_copy_dir):
@@ -81,7 +89,7 @@ def dbnet_get_text_box(img_path: str) -> np.ndarray:
     """运行 DBNet，获取指定图片的文本框坐标。"""
 
     location_cool = Run_onnx_det(img_path)
-    dbnet_data = np.empty((len(location_cool), 4))  # [x1,x2,x3,x4]
+    dbnet_data = np.empty((len(location_cool), 4))
     for i in range(len(location_cool)):
         dbnet_data[i][0] = min(location_cool[i][2], location_cool[i][0])
         dbnet_data[i][1] = min(location_cool[i][3], location_cool[i][1])
@@ -427,19 +435,28 @@ def extract_pin_serials(L3, package_classes: str):
             bottom_ocr_data,
         )
 
-        serial_numbers_data = np.empty((0, 4))
-        for item in bottom_BGA_serial_number:
-            mid = np.empty(5)
-            mid[0:4] = item["location"].astype(str)
-            mid[4] = item["key_info"][0]
-            serial_numbers_data = np.r_[serial_numbers_data, [mid]]
+        def _extract_scalar(info):
+            if not info:
+                return ""
+            value = info[0]
+            if isinstance(value, (list, tuple)):
+                return value[0] if value else ""
+            return value
 
-        serial_letters_data = np.empty((0, 4))
+        serial_numbers_rows = []
+        for item in bottom_BGA_serial_number:
+            row = [str(coord) for coord in item["location"]]
+            row.append(_extract_scalar(item.get("key_info", [])))
+            serial_numbers_rows.append(row)
+
+        serial_letters_rows = []
         for item in bottom_BGA_serial_letter:
-            mid = np.empty(5)
-            mid[0:4] = item["location"].astype(str)
-            mid[4] = item["key_info"][0]
-            serial_letters_data = np.r_[serial_letters_data, [mid]]
+            row = [str(coord) for coord in item["location"]]
+            row.append(_extract_scalar(item.get("key_info", [])))
+            serial_letters_rows.append(row)
+
+        serial_numbers_data = np.array(serial_numbers_rows) if serial_numbers_rows else np.empty((0, 5))
+        serial_letters_data = np.array(serial_letters_rows) if serial_letters_rows else np.empty((0, 5))
 
         (
             pin_num_x_serial,
@@ -451,6 +468,25 @@ def extract_pin_serials(L3, package_classes: str):
             bottom_BGA_serial_number,
             bottom_BGA_serial_letter,
         )
+
+        # 使用完整脚本中的 BGA pin 提取逻辑，保证结果一致。
+        try:
+            from packagefiles.PackageExtract.get_pairs_data_present5 import extract_BGA_PIN  # type: ignore
+        except ImportError as exc:
+            print("extract_BGA_PIN 模块导入失败:", exc)
+        else:
+            try:
+                bga_pin_x, bga_pin_y, loss_pin, loss_color = extract_BGA_PIN()
+                if bga_pin_x:
+                    pin_num_x_serial = bga_pin_x
+                if bga_pin_y:
+                    pin_num_y_serial = bga_pin_y
+                if loss_pin:
+                    recite_data(L3, "loss_pin", loss_pin)
+                if loss_color:
+                    recite_data(L3, "loss_color", loss_color)
+            except Exception as exc:
+                print("extract_BGA_PIN 调用失败:", exc)
 
         recite_data(L3, "bottom_BGA_serial_num", bottom_BGA_serial_number)
         recite_data(L3, "bottom_BGA_serial_letter", bottom_BGA_serial_letter)
@@ -640,3 +676,12 @@ def compute_qfp_parameters(L3):
     QFP_parameter_list = _pairs_module.resort_parameter_list_2(QFP_parameter_list)
 
     return QFP_parameter_list, nx, ny
+
+
+if __name__ == "__main__":
+    print("当前目录路径:", current_dir)
+    print("上一级目录路径:", parent_dir)
+    print("再上一级目录路径:", root_dir)
+    print(os.path.exists("Result/Package_extract/data/top.jpg"))
+    print(os.getcwd())
+
