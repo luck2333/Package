@@ -104,6 +104,7 @@ def yolo_classify(img_path: str, package_classes: str):
     """调用 YOLO 系列检测器，返回图像元素的坐标信息。"""
 
     if package_classes == "BGA":
+        # BGA 封装需要额外合并 DETR 结果，强化 PIN 及边框的检测质量。
         (
             yolox_pairs,
             yolox_num,
@@ -178,6 +179,7 @@ def get_data_location_by_yolo_dbnet(
     L3 = []
     empty_data = np.empty((0, 4))
 
+    # 使用字典暂存每个视图的检测结果，便于后续统一展开成 L3 列表。
     view_results = {}
     for view in view_names:
         img_path = os.path.join(package_path, f"{view}.jpg")
@@ -196,7 +198,6 @@ def get_data_location_by_yolo_dbnet(
                 BGA_serial_letter,
             ) = yolo_classify(img_path, package_classes)
         else:
-            print("未找到视图,返回空值")
             dbnet_data = empty_data
             yolox_pairs = empty_data
             yolox_num = empty_data
@@ -224,22 +225,13 @@ def get_data_location_by_yolo_dbnet(
 
     for view in view_names:
         results = view_results[view]
-        for key in (
-            "dbnet_data",
-            "yolox_pairs",
-            "yolox_num",
-            "yolox_serial_num",
-            "pin",
-            "other",
-            "pad",
-            "border",
-            "angle_pairs",
-        ):
+        for key in ("dbnet_data", "yolox_pairs", "yolox_num", "yolox_serial_num", "pin", "other", "pad", "border", "angle_pairs"):
             L3.append({"list_name": f"{view}_{key}", "list": results[key]})
         if view == "bottom":
             L3.append({"list_name": "bottom_BGA_serial_letter", "list": results["BGA_serial_letter"]})
             L3.append({"list_name": "bottom_BGA_serial_num", "list": results["BGA_serial_num"]})
 
+    # 返回与旧流程一致的 L3 数据结构，方便直接替换原有实现。
     return L3
 
 
