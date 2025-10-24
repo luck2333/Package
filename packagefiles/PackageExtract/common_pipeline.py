@@ -422,41 +422,47 @@ def extract_pin_serials(L3, package_classes: str):
         recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
 
     if package_classes == "BGA":
-        bottom_BGA_serial_number = find_list(L3, "bottom_BGA_serial_num")
-        bottom_BGA_serial_letter = find_list(L3, "bottom_BGA_serial_letter")
+        bottom_serial_numbers = find_list(L3, "bottom_BGA_serial_num")
+        bottom_serial_letters = find_list(L3, "bottom_BGA_serial_letter")
 
         (
-            bottom_BGA_serial_number,
-            bottom_BGA_serial_letter,
+            serial_numbers_candidates,
+            serial_letters_candidates,
             bottom_ocr_data,
         ) = _pairs_module.find_BGA_PIN(
-            bottom_BGA_serial_number,
-            bottom_BGA_serial_letter,
+            bottom_serial_numbers,
+            bottom_serial_letters,
             bottom_ocr_data,
         )
 
-        def _extract_scalar(info):
-            if not info:
-                return ""
-            value = info[0]
-            if isinstance(value, (list, tuple)):
-                return value[0] if value else ""
-            return value
+        def _flatten_key_info(raw_info):
+            """将嵌套的 key_info 拆解为最内层的文本，缺失时返回 "0"。"""
 
-        serial_numbers_rows = []
-        for item in bottom_BGA_serial_number:
-            row = [str(coord) for coord in item["location"]]
-            row.append(_extract_scalar(item.get("key_info", [])))
-            serial_numbers_rows.append(row)
+            value = raw_info
+            while isinstance(value, (list, tuple)):
+                if not value:
+                    return "0"
+                value = value[0]
+            if value in (None, ""):
+                return "0"
+            return str(value)
 
-        serial_letters_rows = []
-        for item in bottom_BGA_serial_letter:
-            row = [str(coord) for coord in item["location"]]
-            row.append(_extract_scalar(item.get("key_info", [])))
-            serial_letters_rows.append(row)
+        def _build_serial_matrix(items):
+            rows: list[list[str]] = []
+            for item in items:
+                coords = [str(coord) for coord in item.get("location", [])]
+                if len(coords) != 4:
+                    continue
+                text = _flatten_key_info(item.get("key_info", []))
+                rows.append(coords + [text])
+            return (
+                np.array(rows, dtype=str)
+                if rows
+                else np.empty((0, 5))
+            )
 
-        serial_numbers_data = np.array(serial_numbers_rows) if serial_numbers_rows else np.empty((0, 5))
-        serial_letters_data = np.array(serial_letters_rows) if serial_letters_rows else np.empty((0, 5))
+        serial_numbers_data = _build_serial_matrix(serial_numbers_candidates)
+        serial_letters_data = _build_serial_matrix(serial_letters_candidates)
 
         (
             pin_num_x_serial,
@@ -465,8 +471,8 @@ def extract_pin_serials(L3, package_classes: str):
         ) = _pairs_module.find_pin_num_pin_1(
             serial_numbers_data,
             serial_letters_data,
-            bottom_BGA_serial_number,
-            bottom_BGA_serial_letter,
+            bottom_serial_numbers,
+            bottom_serial_letters,
         )
 
         # 使用完整脚本中的 BGA pin 提取逻辑，保证结果一致。
@@ -488,8 +494,8 @@ def extract_pin_serials(L3, package_classes: str):
             except Exception as exc:
                 print("extract_BGA_PIN 调用失败:", exc)
 
-        recite_data(L3, "bottom_BGA_serial_num", bottom_BGA_serial_number)
-        recite_data(L3, "bottom_BGA_serial_letter", bottom_BGA_serial_letter)
+        recite_data(L3, "bottom_BGA_serial_num", serial_numbers_candidates)
+        recite_data(L3, "bottom_BGA_serial_letter", serial_letters_candidates)
         recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
         recite_data(L3, "pin_num_x_serial", pin_num_x_serial)
         recite_data(L3, "pin_num_y_serial", pin_num_y_serial)

@@ -285,22 +285,29 @@ class PipelineStepFunctionTest(unittest.TestCase):
         self.assertEqual(mock_find_pairs_length.call_count, 2)
 
     def test_extract_pin_serials_handles_bga_branch(self):
-        """BGA 模式应调用 find_BGA_PIN 并写入序号信息。"""
+        """BGA 模式应使用原始检测框参与 PIN 推断。"""
+
+        detected_serial_nums = np.array([[1, 2, 3, 4]])
+        detected_serial_letters = np.array([[5, 6, 7, 8]])
+        ocr_entry = {
+            "location": np.array([[10.0, 11.0, 12.0, 13.0]])[0],
+            "key_info": [["9"]],
+        }
 
         L3 = [
             {"list_name": "top_yolox_serial_num", "list": []},
             {"list_name": "bottom_yolox_serial_num", "list": []},
             {"list_name": "top_ocr_data", "list": []},
             {"list_name": "bottom_ocr_data", "list": ["raw"]},
-            {"list_name": "bottom_BGA_serial_num", "list": ["initial_num"]},
-            {"list_name": "bottom_BGA_serial_letter", "list": ["initial_letter"]},
+            {"list_name": "bottom_BGA_serial_num", "list": detected_serial_nums},
+            {"list_name": "bottom_BGA_serial_letter", "list": detected_serial_letters},
         ]
 
         with patch(
             "packagefiles.PackageExtract.common_pipeline._pairs_module.find_BGA_PIN",
             return_value=(
-                [],
-                [],
+                [ocr_entry],
+                [ocr_entry],
                 ["ocr"],
             ),
         ) as mock_find_bga_pin, patch(
@@ -309,14 +316,28 @@ class PipelineStepFunctionTest(unittest.TestCase):
         ) as mock_find_pin_num_pin_1:
             updated = common_pipeline.extract_pin_serials(L3, "BGA")
 
-        self.assertEqual(common_pipeline.find_list(updated, "bottom_BGA_serial_num"), [])
-        self.assertEqual(common_pipeline.find_list(updated, "bottom_BGA_serial_letter"), [])
+        self.assertEqual(
+            common_pipeline.find_list(updated, "bottom_BGA_serial_num"),
+            [ocr_entry],
+        )
+        self.assertEqual(
+            common_pipeline.find_list(updated, "bottom_BGA_serial_letter"),
+            [ocr_entry],
+        )
         self.assertEqual(common_pipeline.find_list(updated, "bottom_ocr_data"), ["ocr"])
         self.assertEqual(common_pipeline.find_list(updated, "pin_num_x_serial"), 10)
         self.assertEqual(common_pipeline.find_list(updated, "pin_num_y_serial"), 12)
         self.assertEqual(common_pipeline.find_list(updated, "pin_1_location"), [1, 2])
-        mock_find_bga_pin.assert_called_once()
-        mock_find_pin_num_pin_1.assert_called_once()
+        mock_find_bga_pin.assert_called_once_with(
+            detected_serial_nums,
+            detected_serial_letters,
+            ["raw"],
+        )
+        serial_matrix, letter_matrix, *_ = mock_find_pin_num_pin_1.call_args[0]
+        self.assertEqual(len(serial_matrix), 1)
+        self.assertEqual(len(serial_matrix[0]), 5)
+        self.assertEqual(len(letter_matrix), 1)
+        self.assertEqual(len(letter_matrix[0]), 5)
 
 
 if __name__ == "__main__":
