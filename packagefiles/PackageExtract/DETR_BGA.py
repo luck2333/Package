@@ -4,6 +4,13 @@ import numpy as np
 import time
 import os
 import cv2
+from pathlib import Path
+
+try:
+    from packagefiles.model_paths import yolo_model_path
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    def yolo_model_path(*parts):
+        return str(Path(__file__).resolve().parents[2] / 'model' / 'yolo_model' / Path(*parts))
 # 全局路径
 DATA = 'Result/Package_extract/data'
 DATA_BOTTOM_CROP = 'Result/Package_extract/data_bottom_crop'
@@ -16,7 +23,7 @@ BGA_BOTTOM = 'Result/Package_extract/bga_bottom'
 PINMAP = 'Result/Package_extract/pinmap'
 YOLOX_DATA = 'Result/Package_extract/yolox_data'
 
-session = ort.InferenceSession(f"model/yolo_model/package_model/rtdetr_r50vd_best0521_BGA.onnx")
+session = ort.InferenceSession(yolo_model_path('package_model', 'rtdetr_r50vd_best0521_BGA.onnx'))
 
 def vis(img, boxes, scores, cls_ids, conf, class_names):
     _COLORS = np.array(
@@ -260,7 +267,7 @@ def DETR_BGA(img_path, package_classes):
         # YOLOX_weight = "DFN_SON_0831.onnx"
         if package_classes == 'BGA':
             YOLOX_weight = 'rtdetr_r50vd_best0521_BGA.onnx'
-        weight_path = 'model/yolo_model/package_model/' + YOLOX_weight
+        weight_path = yolo_model_path('package_model', YOLOX_weight)
 
 
         other_num = 0

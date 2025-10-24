@@ -1,35 +1,7 @@
+### extract_package
 
-# 外部文件：
-import os
-
-import numpy as np
-
-from packagefiles.PackageExtract.common_pipeline import (
-    compute_qfp_parameters,
-    enrich_pairs_with_lines,
-    extract_pin_serials,
-    finalize_pairs,
-    get_data_location_by_yolo_dbnet,
-    match_pairs_with_text,
-    normalize_ocr_candidates,
-    prepare_workspace,
-    preprocess_pairs_and_text,
-    remove_other_annotations,
-    run_svtr_ocr,
-)
-from packagefiles.PackageExtract.function_tool import *
-from packagefiles.PackageExtract.get_pairs_data_present5_test import *
-import json
-#全局路径
-DATA = 'Result/Package_extract/data'
-DATA_BOTTOM_CROP = 'Result/Package_extract/data_bottom_crop'
-DATA_COPY = 'Result/Package_extract/data_copy'
-ONNX_OUTPUT = 'Result/Package_extract/onnx_output'
-OPENCV_OUTPUT = 'Result/Package_extract/opencv_output'
-
-
-
-def extract_package(package_classes, page_num):
+```python
+def extract_package(package_classes):
     # 完成图片大小固定、清空建立文件夹等各种操作
     prepare_workspace(
         DATA,
@@ -51,32 +23,35 @@ def extract_package(package_classes, page_num):
     数据整理
     输出参数
     '''
+    # BGA独有流程：获取pinmap，找到缺pin位置信息
+    pin_map = time_save_find_pinmap()
+    pin_output = 1
     # (1)在各个视图中用yolox识别图像元素LOCATION，dbnet识别文本location
     L3 = get_data_location_by_yolo_dbnet(DATA, package_classes)
 
     # (2)在yolo和dbnet的标注文本框中去除OTHER类型文本框
-    L3 = remove_other_annotations(L3)
+    L3 = data_delete_other(L3)
 
     # (3)为尺寸线寻找尺寸界限
-    L3 = enrich_pairs_with_lines(L3, DATA, key)
+    L3 = for_pairs_find_lines(L3, key)
 
     # 处理数据
-    L3 = preprocess_pairs_and_text(L3, key)
+    L3 = resize_data_1(L3, key)
 
     # (4)SVTR识别标注内容
-    L3 = run_svtr_ocr(L3)
+    L3 = SVTR_get_data(L3)
 
     # (5)SVTR后处理数据
-    L3 = normalize_ocr_candidates(L3, key)
+    L3 = get_max_medium_min(L3, key)
 
     # (6)提取并分离出yolo和dbnet检测出的标注中的序号
-    L3 = extract_pin_serials(L3, package_classes)
+    L3 = get_Pin_data(L3, package_classes)
 
     # (7)匹配pairs和data
-    L3 = match_pairs_with_text(L3, key)
+    L3 = MPD_data(L3, key)
 
     # 处理数据
-    L3 = finalize_pairs(L3)
+    L3 = resize_data_2(L3)
 
     '''
         输出QFP参数
@@ -90,143 +65,75 @@ def extract_package(package_classes, page_num):
         pad_x,pad_y
     '''
     # 语义对齐
-    QFP_parameter_list, nx, ny = compute_qfp_parameters(L3)
-    # 整理获得的参数
-    parameter_list = get_QFP_parameter_data(QFP_parameter_list, nx, ny)
 
-    # 20250722添加
-    # 指定要查找的 page_num
-    target_page_num = page_num
-    json_file = 'output.json'
-    result = []
-    # 读取 JSON 文件
-    print("开始读取json文件")
-    # with open(json_file, 'r', encoding='utf-8') as f:
-    #     data = json.load(f)
-    with open(json_file, 'r', encoding='utf-8') as f:
-        content = f.read().strip()
-        if content:
-            try:
-                data = json.loads(content)
-                print("解析成功")
-                for item in data:
-                    if item['page_num'] == target_page_num:
-                        result.append(item['pin'])
-                        result.append(item['length'])
-                        result.append(item['width'])
-                        result.append(item['height'])
-                        result.append(item['horizontal_pin'])
-                        result.append(item['vertical_pin'])
-                print("json文件读取完毕")
-                print("json:", result)
-            except json.JSONDecodeError as e:
-                print("JSON 解析失败:", e)
-        else:
-            print("文件为空")
-    # 遍历列表，查找匹配的条目
+    # QFP_parameter_list, nx, ny = find_QFP_parameter(L3)
+    # # 整理获得的参数
+    # parameter_list = get_QFP_parameter_data(QFP_parameter_list, nx, ny)
+    # print("修改前的参数列表", parameter_list)
+    # # 参数检查与修改
+    # parameter_list = alter_QFP_parameter_data(parameter_list)
+    # print("修改后的参数列表", parameter_list)
+    return parameter_list
+```
 
+### time_save_find_pinmap
 
-    if result != []:
-        if result[0] != None:
-            if result[4] != None and result[5] != None:
-                if abs(result[4] * result[5] - result[0]) < 1e-9 and abs(nx * ny - result[4] * result[5]) > 1e-9:
-                    nx = result[4]
-                    ny = result[5]
-                if nx == 0 and result[4] != None:
-                    nx = result[4]
-                if ny == 0 and result[5] != None:
-                    ny = result[5]
-    print("修改前的参数列表", parameter_list)
-    # 参数检查与修改
-    parameter_list = alter_QFP_parameter_data(parameter_list)
-    print("修改后的参数列表", parameter_list)
-    # if result != []:
-    #     if result[1] != None:
-    #         parameter_list[0][1] = result[1]
-    #         parameter_list[0][2] = result[1]
-    #         parameter_list[0][3] = result[1]
-    #     if result[2] != None:
-    #         parameter_list[1][1] = result[2]
-    #         parameter_list[1][2] = result[2]
-    #         parameter_list[1][3] = result[2]
-    #     if result[3] != None:
-    #         parameter_list[2][1] = result[3]
-    #         parameter_list[2][2] = result[3]
-    #         parameter_list[2][3] = result[3]
-    try:
-        length = float(parameter_list[0][2])
-    except:
-        print("无法转化为浮点数length", parameter_list[0][2])
-    try:
-        weight = float(parameter_list[1][2])
-    except:
-        print("无法转化为浮点数weight", parameter_list[1][2])
-    try:
-        height = float(parameter_list[2][2])
-    except:
-        print("无法转化为浮点数height", parameter_list[2][2])
-    if result != []:
-        if result[1] != None and result[1] != length and (result[1] != weight and result[2] != length):
-            parameter_list[0][1] = ''
-            parameter_list[0][2] = result[1]
-            parameter_list[0][3] = ''
-        if result[2] != None and result[2] != weight and (result[1] != weight and result[2] != length):
-            parameter_list[1][1] = ''
-            parameter_list[1][2] = result[2]
-            parameter_list[1][3] = ''
-        if result[3] != None and result[3] != height:
-            parameter_list[2][1] = ''
-            parameter_list[2][2] = result[3]
-            parameter_list[2][3] = ''
+```python
+def time_save_find_pinmap():
+    result_queue = queue.Queue()
+    thread = threading.Thread(target=long_running_task, args=(result_queue,))
+    thread.start()
 
+    thread.join(timeout=6)  # 设置超时时间为5秒
+    if thread.is_alive():
+        print("读取pinmap进程花费时间过长，跳过")
+        pin_map = np.ones((10, 10))
+        # 记录pin的行列数
+        pin_num_x_y = np.array([0, 0])
+        pin_num_x_y = pin_num_x_y.astype(int)
+        path = r'yolox_data\pin_num.txt'
+        np.savetxt(path, pin_num_x_y)
+    else:
+        try:
+            pin_map = result_queue.get_nowait()  # 尝试获取结果
+            # print("Result:", pin_map)
+        except queue.Empty:
+            print("Queue is empty, no result available.")
+            pin_map = np.ones((10, 10))
+            # 记录pin的行列数
+            pin_num_x_y = np.array([0, 0])
+            pin_num_x_y = pin_num_x_y.astype(int)
+            path = r'yolox_data\pin_num.txt'
+            np.savetxt(path, pin_num_x_y)
+    # 记录pin的行列数
+    pin_num_x_y = np.array([pin_map.shape[1], pin_map.shape[0]])
+    pin_num_x_y = pin_num_x_y.astype(int)
+    path = r'yolox_data\pin_num.txt'
+    np.savetxt(path, pin_num_x_y)
 
-    #20250621修改顺序
-    # ['实体长D1', '实体宽E1', '实体高A', '支撑高A1', '端子高A3', '外围长D', '外围宽E', 'PIN长L', 'PIN宽b', '行PIN数',
-    #  '列PIN数', '行/列PIN间距e', '散热盘长D2', '散热盘宽E2', '削角长度', '端子厚度', '接触角度', '端腿角度',
-    #  '主体顶部绘制角度']
+    return pin_map
+```
 
-    # new_parameter_list = []
-    # new_parameter_list.append(parameter_list[0])
-    # new_parameter_list.append(parameter_list[1])
-    # new_parameter_list.append(parameter_list[2])
-    # new_parameter_list.append(parameter_list[3])
-    # new_parameter_list.append([0,'-','-','-'])
-    # new_parameter_list.append(parameter_list[5])
-    # new_parameter_list.append(parameter_list[6])
-    # new_parameter_list.append(parameter_list[7])
-    # new_parameter_list.append(parameter_list[8])
-    # new_parameter_list.append(parameter_list[9])
-    # new_parameter_list.append(parameter_list[10])
-    # new_parameter_list.append(parameter_list[11])
-    # new_parameter_list.append(parameter_list[12])
-    # new_parameter_list.append(parameter_list[13])
-    # new_parameter_list.append(parameter_list[14])
-    # new_parameter_list.append(parameter_list[15])
-    # new_parameter_list.append(parameter_list[16])
-    # new_parameter_list.append(parameter_list[17])
-    # new_parameter_list.append(parameter_list[18])
-    # 20250621修改顺序
-    new_parameter_list = []
-    new_parameter_list.append(parameter_list[9])
-    new_parameter_list.append(parameter_list[10])
-    new_parameter_list.append(parameter_list[2])
-    new_parameter_list.append(parameter_list[3])
-    new_parameter_list.append(parameter_list[5])
-    new_parameter_list.append(parameter_list[6])
-    new_parameter_list.append(parameter_list[0])
-    new_parameter_list.append(parameter_list[1])
-    new_parameter_list.append(parameter_list[16])
-    new_parameter_list.append([0, '-', '-', '-'])
-    new_parameter_list.append(parameter_list[7])
-    new_parameter_list.append(parameter_list[8])
-    new_parameter_list.append(parameter_list[15])
-    new_parameter_list.append([0, '-', '-', '-'])
-    new_parameter_list.append(parameter_list[12])
-    new_parameter_list.append(parameter_list[13])
-    return new_parameter_list
+### long_running_task
 
+```python
+def long_running_task(result_queue):
+    print()
+    print("***/开始检测pin/***")
+    result = find_pin()
+    # try:
+    #     result = find_pin()
+    # except:
+    #     print("pinmap没有正常读取，请记录pdf并反馈")
+    #     result = np.ones((10, 10))
+    result_queue.put(result)
+    print("***/结束检测pin/***")
+    print()
+```
 
+### data_delete_other
 
+```python
 def data_delete_other(L3):
     """
     在yolo和dbnet的标注文本框中去除OTHER类型文本框
@@ -271,10 +178,11 @@ def data_delete_other(L3):
     recite_data(L3, 'detailed_dbnet_data', detailed_dbnet_data)
 
     return L3
+```
 
+### for_pairs_find_lines
 
-
-
+```python
 def for_pairs_find_lines(L3, test_mode):
     """
     为尺寸线寻找尺寸界限
@@ -314,8 +222,11 @@ def for_pairs_find_lines(L3, test_mode):
     recite_data(L3, 'side_yolox_pairs_length', side_yolox_pairs_length)
     recite_data(L3, 'detailed_yolox_pairs_length', detailed_yolox_pairs_length)
     return L3
+```
 
+### resize_data_1
 
+```python
 def resize_data_1(L3, key):
     """
     处理数据
@@ -352,9 +263,11 @@ def resize_data_1(L3, key):
     recite_data(L3, 'bottom_dbnet_data_all', bottom_dbnet_data_all)
 
     return L3
+```
 
+### SVTR_get_data
 
-
+```python
 def SVTR_get_data(L3):
     """
 
@@ -376,9 +289,11 @@ def SVTR_get_data(L3):
     recite_data(L3, 'detailed_ocr_data', detailed_ocr_data)
 
     return L3
+```
 
+### get_max_medium_min
 
-
+```python
 def get_max_medium_min(L3, key):
     """
 
@@ -416,59 +331,31 @@ def get_max_medium_min(L3, key):
     recite_data(L3, 'detailed_ocr_data', detailed_ocr_data)
 
     return L3
+```
 
+### get_Pin_data
 
-def get_Pin_data(L3, package_classes):
+```python
+def get_Pin_data(L3):
     top_yolox_serial_num = find_list(L3, 'top_yolox_serial_num')
     bottom_yolox_serial_num = find_list(L3, 'bottom_yolox_serial_num')
     top_ocr_data = find_list(L3, 'top_ocr_data')
     bottom_ocr_data = find_list(L3, 'bottom_ocr_data')
-    if package_classes == 'QFP' or package_classes == 'QFN' or package_classes == 'SOP' or package_classes == 'SON':
-        top_serial_numbers_data, bottom_serial_numbers_data, top_ocr_data, bottom_ocr_data = find_PIN(top_yolox_serial_num,
-                                                                       bottom_yolox_serial_num, top_ocr_data,
-                                                                       bottom_ocr_data)
 
-        recite_data(L3, 'top_serial_numbers_data', top_serial_numbers_data)
-        recite_data(L3, 'bottom_serial_numbers_data', bottom_serial_numbers_data)
-        recite_data(L3, 'top_ocr_data', top_ocr_data)
-        recite_data(L3, 'bottom_ocr_data', bottom_ocr_data)
-    if package_classes == 'BGA':
-        bottom_BGA_serial_number = find_list(L3, 'bottom_BGA_serial_number')
-        bottom_BGA_serial_letter = find_list(L3, 'bottom_BGA_serial_letter')
-        bottom_ocr_data = find_list(L3, 'bottom_ocr_data')
+    top_serial_numbers_data, bottom_serial_numbers_data, top_ocr_data, bottom_ocr_data = find_PIN(top_yolox_serial_num,
+                                                                   bottom_yolox_serial_num, top_ocr_data,
+                                                                   bottom_ocr_data)
 
-        bottom_BGA_serial_number, bottom_BGA_serial_letter, bottom_ocr_data = find_BGA_PIN(
-            bottom_BGA_serial_number, bottom_BGA_serial_letter, bottom_ocr_data)
-        #数据整理适应旧函数
-        # serial_numbers_data: np.(, 4)['x1', 'y1', 'x2', 'y2', 'str']ocr之后得到的单个数字
-        # serial_letters_data: np.(, 4)['x1', 'y1', 'x2', 'y2', 'str']
-        # serial_numbers: np.(, 4)[x1, y1, x2, y2)yolo得到的一组数字序号位置
-        # serial_letters: np.(, 4)[x1, y1, x2, y2)
-        serial_numbers_data = np.empty((0,4))
-        for i in range(len(bottom_BGA_serial_number)):
-            mid = np.empty(5)
-            mid[0:4] = bottom_BGA_serial_number[i]['location'].astype(str)
-            mid[4] = bottom_BGA_serial_number[i]['key_info'][0]
-            serial_numbers_data = np.r_[serial_numbers_data, [mid]]
-        serial_numbers_data = np.empty((0,4))
-        for i in range(len(bottom_BGA_serial_letter)):
-            mid = np.empty(5)
-            mid[0:4] = bottom_BGA_serial_letter[i]['location'].astype(str)
-            mid[4] = bottom_BGA_serial_letter[i]['key_info'][0]
-            serial_letters_data = np.r_[serial_letters_data, [mid]]
-        serial_numbers = bottom_BGA_serial_number
-        serial_letters = bottom_BGA_serial_letter
-        pin_num_x_serial, pin_num_y_serial, pin_1_location = find_pin_num_pin_1(serial_numbers_data,
-                                                                                serial_letters_data,
-                                                                                serial_numbers, serial_letters)
-        recite_data(L3, 'bottom_BGA_serial_number', bottom_BGA_serial_number)
-        recite_data(L3, 'bottom_BGA_serial_letter', bottom_BGA_serial_letter)
-        recite_data(L3, 'bottom_ocr_data', bottom_ocr_data)
-        recite_data(L3, 'pin_num_x_serial', pin_num_x_serial)
-        recite_data(L3, 'pin_num_y_serial', pin_num_y_serial)
-        recite_data(L3, 'pin_1_location', pin_1_location)
+    recite_data(L3, 'top_serial_numbers_data', top_serial_numbers_data)
+    recite_data(L3, 'bottom_serial_numbers_data', bottom_serial_numbers_data)
+    recite_data(L3, 'top_ocr_data', top_ocr_data)
+    recite_data(L3, 'bottom_ocr_data', bottom_ocr_data)
     return L3
+```
 
+### MPD_data
+
+```python
 def MPD_data(L3, key):
     # 从L3中获取数据
     top_yolox_pairs = find_list(L3, 'top_yolox_pairs')
@@ -496,8 +383,11 @@ def MPD_data(L3, key):
     recite_data(L3, 'side_ocr_data', side_ocr_data)
     recite_data(L3, 'detailed_ocr_data', detailed_ocr_data)
     return L3
+```
 
+### resize_data_2
 
+```python
 def resize_data_2(L3):
 
 
@@ -541,7 +431,11 @@ def resize_data_2(L3):
     # print("side视图中的PIN,pad,Border:\n", side_pin, side_pad, side_border)
     # print("detailed视图中的PIN,pad,Border:\n", detailed_pin, detailed_pad, detailed_border)
     return L3
+```
 
+### find_QFP_parameter
+
+```python
 def find_QFP_parameter(L3):
     top_serial_numbers_data = find_list(L3, 'top_serial_numbers_data')
     bottom_serial_numbers_data = find_list(L3, 'bottom_serial_numbers_data')
@@ -594,5 +488,5 @@ def find_QFP_parameter(L3):
     # # 输出参数列表，给出置信度
     # QFP = output_QFP_parameter(QFP_parameter_list, nx, ny)
     return QFP_parameter_list, nx, ny
-# if __name__ == '__main__':
-#     extract_package(package_classes='QFP')
+```
+
