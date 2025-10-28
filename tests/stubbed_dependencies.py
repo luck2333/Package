@@ -153,6 +153,35 @@ def install_common_pipeline_stubs():
     def _stub_find_bga_pin(bottom_serial_num, bottom_serial_letter, bottom_ocr):
         return bottom_serial_num, bottom_serial_letter, bottom_ocr
 
+    def _stub_time_save_find_pinmap(_bottom_border):
+        pin_map = [[1.0, 1.0], [1.0, 1.0]]
+        color_map = [[0.0, 0.0], [0.0, 0.0]]
+        return pin_map, color_map
+
+    def _stub_find_serial_number_letter(serial_numbers, serial_letters, bottom_dbnet):
+        return serial_numbers, serial_letters, bottom_dbnet
+
+    def _stub_ocr_data(_path, dbnet_data):
+        return ["1"] * len(dbnet_data)
+
+    def _stub_filter_bottom_ocr_data(
+        ocr_values,
+        dbnet_serial,
+        serial_numbers,
+        serial_letters,
+        filtered_bottom_dbnet,
+    ):
+        def _append_text(items, text):
+            result = []
+            for row in items:
+                str_row = [str(value) for value in row]
+                result.append(str_row + [text])
+            return result
+
+        serial_matrix = _append_text(serial_numbers, "1")
+        letter_matrix = _append_text(serial_letters, "A")
+        return serial_matrix, letter_matrix, ocr_values
+
     def _stub_find_pin_num_pin_1(_serial_numbers_data, _serial_letters_data, _serial_numbers, _serial_letters):
         return 0, 0, np.array([0, 0])
 
@@ -241,6 +270,10 @@ def install_common_pipeline_stubs():
     fake_pairs_module.data_wrangling = _stub_data_wrangling  # type: ignore[attr-defined]
     fake_pairs_module.find_PIN = _stub_find_pin  # type: ignore[attr-defined]
     fake_pairs_module.find_BGA_PIN = _stub_find_bga_pin  # type: ignore[attr-defined]
+    fake_pairs_module.time_save_find_pinmap = _stub_time_save_find_pinmap  # type: ignore[attr-defined]
+    fake_pairs_module.find_serial_number_letter = _stub_find_serial_number_letter  # type: ignore[attr-defined]
+    fake_pairs_module.ocr_data = _stub_ocr_data  # type: ignore[attr-defined]
+    fake_pairs_module.filter_bottom_ocr_data = _stub_filter_bottom_ocr_data  # type: ignore[attr-defined]
     fake_pairs_module.find_pin_num_pin_1 = _stub_find_pin_num_pin_1  # type: ignore[attr-defined]
     fake_pairs_module.MPD = _stub_mpd  # type: ignore[attr-defined]
     fake_pairs_module.get_better_data_2 = _stub_get_better_data_2  # type: ignore[attr-defined]

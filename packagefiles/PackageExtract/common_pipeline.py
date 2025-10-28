@@ -179,7 +179,6 @@ def get_data_location_by_yolo_dbnet(
     L3 = []
     empty_data = np.empty((0, 4))
 
-    # 使用字典暂存每个视图的检测结果，便于后续统一展开成 L3 列表。
     view_results = {}
     for view in view_names:
         img_path = os.path.join(package_path, f"{view}.jpg")
@@ -198,6 +197,7 @@ def get_data_location_by_yolo_dbnet(
                 BGA_serial_letter,
             ) = yolo_classify(img_path, package_classes)
         else:
+            print("未找到视图,返回空值")
             dbnet_data = empty_data
             yolox_pairs = empty_data
             yolox_num = empty_data
@@ -225,13 +225,22 @@ def get_data_location_by_yolo_dbnet(
 
     for view in view_names:
         results = view_results[view]
-        for key in ("dbnet_data", "yolox_pairs", "yolox_num", "yolox_serial_num", "pin", "other", "pad", "border", "angle_pairs"):
+        for key in (
+            "dbnet_data",
+            "yolox_pairs",
+            "yolox_num",
+            "yolox_serial_num",
+            "pin",
+            "other",
+            "pad",
+            "border",
+            "angle_pairs",
+        ):
             L3.append({"list_name": f"{view}_{key}", "list": results[key]})
         if view == "bottom":
             L3.append({"list_name": "bottom_BGA_serial_letter", "list": results["BGA_serial_letter"]})
             L3.append({"list_name": "bottom_BGA_serial_num", "list": results["BGA_serial_num"]})
 
-    # 返回与旧流程一致的 L3 数据结构，方便直接替换原有实现。
     return L3
 
 
@@ -424,45 +433,42 @@ def extract_pin_serials(L3, package_classes: str):
     if package_classes == "BGA":
         bottom_serial_numbers = find_list(L3, "bottom_BGA_serial_num")
         bottom_serial_letters = find_list(L3, "bottom_BGA_serial_letter")
+        bottom_border = find_list(L3, "bottom_border")
+        bottom_dbnet_data = find_list(L3, "bottom_dbnet_data")
+
+        bottom_dbnet_data_serial = np.array(bottom_dbnet_data)
+
+        try:
+            pin_map, color_map = _pairs_module.time_save_find_pinmap(bottom_border)
+        except Exception as exc:
+            print("time_save_find_pinmap 执行失败:", exc)
+            pin_map = [[1 for _ in range(10)] for _ in range(10)]
+            color_map = [[2 for _ in range(10)] for _ in range(10)]
 
         (
-            serial_numbers_candidates,
-            serial_letters_candidates,
-            bottom_ocr_data,
-        ) = _pairs_module.find_BGA_PIN(
+            serial_numbers_coords,
+            serial_letters_coords,
+            filtered_bottom_dbnet,
+        ) = _pairs_module.find_serial_number_letter(
             bottom_serial_numbers,
             bottom_serial_letters,
-            bottom_ocr_data,
+            bottom_dbnet_data_serial,
         )
 
-        def _flatten_key_info(raw_info):
-            """将嵌套的 key_info 拆解为最内层的文本，缺失时返回 "0"。"""
+        bottom_img_path = os.path.join(DATA, "bottom.jpg")
+        bottom_ocr_strings = _pairs_module.ocr_data(bottom_img_path, bottom_dbnet_data_serial)
 
-            value = raw_info
-            while isinstance(value, (list, tuple)):
-                if not value:
-                    return "0"
-                value = value[0]
-            if value in (None, ""):
-                return "0"
-            return str(value)
-
-        def _build_serial_matrix(items):
-            rows: list[list[str]] = []
-            for item in items:
-                coords = [str(coord) for coord in item.get("location", [])]
-                if len(coords) != 4:
-                    continue
-                text = _flatten_key_info(item.get("key_info", []))
-                rows.append(coords + [text])
-            return (
-                np.array(rows, dtype=str)
-                if rows
-                else np.empty((0, 5))
-            )
-
-        serial_numbers_data = _build_serial_matrix(serial_numbers_candidates)
-        serial_letters_data = _build_serial_matrix(serial_letters_candidates)
+        (
+            serial_numbers_data,
+            serial_letters_data,
+            filtered_bottom_ocr,
+        ) = _pairs_module.filter_bottom_ocr_data(
+            bottom_ocr_strings,
+            bottom_dbnet_data_serial,
+            serial_numbers_coords,
+            serial_letters_coords,
+            filtered_bottom_dbnet,
+        )
 
         (
             pin_num_x_serial,
@@ -471,35 +477,54 @@ def extract_pin_serials(L3, package_classes: str):
         ) = _pairs_module.find_pin_num_pin_1(
             serial_numbers_data,
             serial_letters_data,
-            bottom_serial_numbers,
-            bottom_serial_letters,
+            serial_numbers_coords,
+            serial_letters_coords,
         )
 
-        # 使用完整脚本中的 BGA pin 提取逻辑，保证结果一致。
         try:
-            from packagefiles.PackageExtract.get_pairs_data_present5 import extract_BGA_PIN  # type: ignore
-        except ImportError as exc:
-            print("extract_BGA_PIN 模块导入失败:", exc)
+            from packagefiles.PackageExtract.BGA_extract_old import Is_Loss_Pin  # type: ignore
+        except ImportError:
+            loss_pin = []
+            loss_color = []
         else:
             try:
-                bga_pin_x, bga_pin_y, loss_pin, loss_color = extract_BGA_PIN()
-                if bga_pin_x:
-                    pin_num_x_serial = bga_pin_x
-                if bga_pin_y:
-                    pin_num_y_serial = bga_pin_y
-                if loss_pin:
-                    recite_data(L3, "loss_pin", loss_pin)
-                if loss_color:
-                    recite_data(L3, "loss_color", loss_color)
+                loss_pin, loss_color = Is_Loss_Pin(pin_map, pin_1_location, color_map)
             except Exception as exc:
-                print("extract_BGA_PIN 调用失败:", exc)
+                print("Is_Loss_Pin 执行失败:", exc)
+                loss_pin = []
+                loss_color = []
 
-        recite_data(L3, "bottom_BGA_serial_num", serial_numbers_candidates)
-        recite_data(L3, "bottom_BGA_serial_letter", serial_letters_candidates)
+        loss_pin_record = "None" if len(loss_pin) == 0 else loss_pin
+
+        def _matrix_dimensions(matrix):
+            if hasattr(matrix, "shape"):
+                shape = getattr(matrix, "shape")
+                if len(shape) >= 2:
+                    return int(shape[0]), int(shape[1])
+                if len(shape) == 1:
+                    return int(shape[0]), 0
+            rows = len(matrix)
+            cols = len(matrix[0]) if rows else 0
+            return rows, cols
+
+        rows, cols = _matrix_dimensions(pin_map)
+
+        pin_num_x_serial = int(pin_num_x_serial or 0)
+        pin_num_y_serial = int(pin_num_y_serial or 0)
+
+        if pin_num_x_serial == 0:
+            pin_num_x_serial = int(cols)
+        if pin_num_y_serial == 0:
+            pin_num_y_serial = int(rows)
+
+        recite_data(L3, "bottom_BGA_serial_num", serial_numbers_coords)
+        recite_data(L3, "bottom_BGA_serial_letter", serial_letters_coords)
         recite_data(L3, "bottom_ocr_data", bottom_ocr_data)
         recite_data(L3, "pin_num_x_serial", pin_num_x_serial)
         recite_data(L3, "pin_num_y_serial", pin_num_y_serial)
         recite_data(L3, "pin_1_location", pin_1_location)
+        recite_data(L3, "loss_pin", loss_pin_record)
+        recite_data(L3, "loss_color", loss_color)
 
     return L3
 
