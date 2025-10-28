@@ -104,6 +104,7 @@ def yolo_classify(img_path: str, package_classes: str):
     """调用 YOLO 系列检测器，返回图像元素的坐标信息。"""
 
     if package_classes == "BGA":
+        # BGA 封装需要额外合并 DETR 结果，强化 PIN 及边框的检测质量。
         (
             yolox_pairs,
             yolox_num,
