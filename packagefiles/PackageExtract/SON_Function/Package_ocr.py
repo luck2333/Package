@@ -9,12 +9,19 @@ import pyclipper
 from shapely.geometry import Polygon
 from wand.exceptions import ImageError
 from PIL import Image, ImageDraw,ImageEnhance
+from pathlib import Path
+
+try:
+    from packagefiles.model_paths import ocr_model_path
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    def ocr_model_path(*parts):
+        return str(Path(__file__).resolve().parents[3] / 'model' / 'ocr_model' / Path(*parts))
 import warnings
 import matplotlib
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
-onnx_file_path = "model/ocr_model/onnx_orientation/resnet_orientation.onnx"
+onnx_file_path = ocr_model_path("onnx_orientation", "resnet_orientation.onnx")
 session = onnxruntime.InferenceSession(onnx_file_path)
 
 matplotlib.use('TkAgg')
@@ -383,16 +390,16 @@ class process_pred(object):
 class det_rec_functions(object):
     def __init__(self, image, use_large=False):
         self.img = image.copy()
-        self.det_file = 'model/ocr_model/onnx_det/0529det_model.onnx'
-        self.small_rec_file = 'model/ocr_model/onnx_rec/package_rec_model.onnx'
-        self.large_rec_file = 'model/ocr_model/onnx_rec/package_rec_model.onnx'
+        self.det_file = ocr_model_path('onnx_det', '0529det_model.onnx')
+        self.small_rec_file = ocr_model_path('onnx_rec', 'package_rec_model.onnx')
+        self.large_rec_file = ocr_model_path('onnx_rec', 'package_rec_model.onnx')
         self.onet_det_session = onnxruntime.InferenceSession(self.det_file)
         if use_large:
             self.onet_rec_session = onnxruntime.InferenceSession(self.large_rec_file)
         else:
             self.onet_rec_session = onnxruntime.InferenceSession(self.small_rec_file)
         self.infer_before_process_op, self.det_re_process_op = self.get_process()
-        self.postprocess_op = process_pred('model/ocr_model/rec_dict.txt', 'en', True)
+        self.postprocess_op = process_pred(ocr_model_path('rec_dict.txt'), 'en', True)
 
     def preprocess_image_cv2(self, img):
         # 1. 读取图像

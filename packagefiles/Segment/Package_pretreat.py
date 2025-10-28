@@ -14,11 +14,18 @@ from packagefiles.PackageExtract import QFN_extract
 from packagefiles.PackageExtract import SON_extract
 from packagefiles.PackageExtract import BGA_extract_old
 from packagefiles.PackageExtract.get_pairs_data_present5 import extract_BGA_PIN
+from pathlib import Path
+
+try:
+    from packagefiles.model_paths import yolo_model_path
+except ModuleNotFoundError:  # pragma: no cover - 兼容脚本直接运行
+    def yolo_model_path(*parts):
+        return str(Path(__file__).resolve().parents[2] / 'model' / 'yolo_model' / Path(*parts))
 YOLO_RESULT = 'Result/Package_view/YoloPage'
 SEGMENT_RESULT = 'Result/Package_view/page'
-TEMP_SIDE = 'model/yolo_model/ExtractPackage/side.jpg'
-TEMP_BOTTOM = 'model/yolo_model/ExtractPackage/bottom.jpg'
-TEMP_TOP = 'model/yolo_model/ExtractPackage/top.jpg'
+TEMP_SIDE = yolo_model_path('ExtractPackage', 'side.jpg')
+TEMP_BOTTOM = yolo_model_path('ExtractPackage', 'bottom.jpg')
+TEMP_TOP = yolo_model_path('ExtractPackage', 'top.jpg')
 SEGMENT_SIDE = 'Result/Package_view/page/side.jpg'
 SEGMENT_BOTTOM = 'Result/Package_view/page/bottom.jpg'
 SEGMENT_TOP = 'Result/Package_view/page/top.jpg'
